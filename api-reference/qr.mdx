@@ -1,7 +1,7 @@
 ---
 title: "GET /qr — Browser-Based WhatsApp QR Authentication"
-sidebarTitle: "GET /qr"
-description: "GET /qr serves an auto-refreshing HTML page showing the WhatsApp Web QR code for browser-based Linked Devices authentication."
+sidebarTitle: "QR Code"
+description: "GET /qr serves an HTML page that auto-refreshes every 5 seconds, showing the WhatsApp Web QR code as a base64 image for Linked Devices authentication."
 ---
 
 `GET /qr` is a browser-friendly alternative to phone-number pairing. Instead of returning JSON, it serves a self-contained HTML page that renders the current WhatsApp Web QR code as an image and refreshes itself every 5 seconds. This makes it easy to authenticate on any machine where you have access to both the server and a web browser — just open the URL, scan the code with your phone, and the page will reflect the new `ready` state on its next refresh.

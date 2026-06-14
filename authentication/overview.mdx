@@ -1,5 +1,5 @@
 ---
-title: "WhatsApp Authentication: Linked Devices Explained"
+title: "WhatsApp MCP API: Authentication and Linked Devices"
 sidebarTitle: "Overview"
 description: "Understand how WhatsApp MCP API authenticates using WhatsApp Linked Devices, local session storage, and phone-number pairing codes."
 ---
@@ -16,7 +16,7 @@ The full pairing flow from cold start to ready state looks like this:
 
 3. **User pairs the device** — You have two options to complete the link (see [Two Pairing Methods](#two-pairing-methods) below). Once WhatsApp receives the pairing signal the client state advances to `authenticated`.
 
-4. **Session saved locally** — After a successful pair, whatsapp-web.js persists the full Chrome user profile — including WhatsApp Web's IndexedDB encryption keys — inside `.wwebjs_auth/session-default`. The client state then moves to `ready`.
+4. **Session saved locally** — After a successful pair, whatsapp-web.js persists the full Chrome user profile — including WhatsApp Web's IndexedDB encryption keys — inside `.wwebjs_auth/session-default`. The client state then moves to `ready`, the pending QR code is cleared, and the account info (`wid`, `pushname`, `platform`) is populated from `client.info`.
 
 5. **Automatic reconnect on restart** — On every subsequent server start, Chrome loads the saved profile and reconnects to WhatsApp without requiring a new QR scan or pairing code. The state transitions directly from `starting` to `authenticated` to `ready`.
 
@@ -26,7 +26,7 @@ The server tracks a `state` field that is returned by `GET /api/status`. Each va
 
 | State | Meaning |
 |---|---|
-| `stopped` | Server has not been started or the client has not been initialized. |
+| `stopped` | No WhatsApp client is running. This is the initial state and the state after a successful logout. |
 | `starting` | Client is initializing — Chrome is launching and WhatsApp Web is loading. |
 | `qr` | A QR code has been received from WhatsApp Web and is waiting to be scanned. |
 | `authenticated` | Pairing completed; the session is being loaded into the client. |

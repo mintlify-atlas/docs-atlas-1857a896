@@ -1,7 +1,7 @@
 ---
-title: "POST /api/send — Send a WhatsApp Text Message"
-sidebarTitle: "POST /api/send"
-description: "POST /api/send sends a text message to a WhatsApp phone number through the authenticated Linked Devices session."
+title: "POST /api/send — Send a WhatsApp Text Message to a Contact"
+sidebarTitle: "Send Message"
+description: "POST /api/send delivers a text message to any WhatsApp number via the authenticated Linked Devices session and returns the message ID and send timestamp."
 ---
 
 `POST /api/send` is the primary way to send an outgoing WhatsApp text message. It accepts a phone number and a message string, normalizes the phone number to a WhatsApp chat ID, and delivers the message through the active Linked Devices session. On success it returns metadata about the delivered message including the WhatsApp chat ID, message ID, and a send timestamp.

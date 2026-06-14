@@ -12,7 +12,7 @@ All configuration for WhatsApp MCP API is done through **environment variables**
 |---|---|---|
 | `WHATSAPP_MCP_HOST` | `127.0.0.1` | The network interface the HTTP server binds to. Change to `0.0.0.0` to listen on all interfaces. |
 | `WHATSAPP_MCP_PORT` | `8790` | The TCP port the server listens on. |
-| `WHATSAPP_AUTH_DIR` | `../.wwebjs_auth` (relative to project root) | Directory where the WhatsApp Web Linked Devices session (Chromium profile) is persisted. |
+| `WHATSAPP_AUTH_DIR` | `.wwebjs_auth` in the repository root (one level above `whatsapp-mcp-api/`) | Directory where the WhatsApp Web Linked Devices session (Chromium profile) is persisted. |
 | `WHATSAPP_CHROME_EXECUTABLE` | `C:\Program Files\Google\Chrome\Application\chrome.exe` | Absolute path to the Chrome or Chromium binary that Puppeteer will launch. |
 | `WHATSAPP_HEADLESS` | `false` | Set to `true` to run Chrome in headless mode. Useful on servers without a display. |
 
@@ -74,7 +74,7 @@ Setting `WHATSAPP_HEADLESS=true` tells Puppeteer to run Chrome without a visible
 
 The `WHATSAPP_AUTH_DIR` variable controls where the WhatsApp Web Linked Devices session data is stored. The server uses `whatsapp-web.js`'s `LocalAuth` strategy, which saves a full Chromium user-data profile containing the linked-device credentials.
 
-- **Default location** (relative to project root): `.wwebjs_auth/session-default`
+- **Default location**: `whatsapp-api/.wwebjs_auth/session-default` (one level above the `whatsapp-mcp-api/` server directory)
 - The directory is created automatically on first run.
 - After a successful pairing, this directory holds your linked-device credentials. The server reads it on every startup to restore the session without requiring a new pairing code.
 - **Do not delete this directory** while you want to keep the session active. Deleting it means the Linked Device is orphaned and you will need to pair again.

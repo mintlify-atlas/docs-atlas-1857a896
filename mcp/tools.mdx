@@ -1,10 +1,10 @@
 ---
-title: "MCP Tool Reference: WhatsApp Tools for AI Agents"
+title: "MCP Tool Reference: All 7 WhatsApp Tools for AI Agents"
 sidebarTitle: "Tools"
 description: "Full reference for all 7 MCP tools exposed by WhatsApp MCP API — status, auth, pairing, send message, list chats, read messages, and logout."
 ---
 
-The MCP endpoint exposes **7 tools** that an AI agent or MCP-compatible client can discover via `tools/list` and invoke via `tools/call`. Each tool is called by posting a JSON-RPC 2.0 request to `POST http://127.0.0.1:8790/mcp` with `method: "tools/call"` and a `params` object containing the tool `name` and its `arguments`. All tool responses are wrapped in a `content` array — parse the `text` field of the first element to get the structured JSON result.
+The MCP endpoint exposes **7 tools** that an AI agent or MCP-compatible client can discover via `tools/list` and invoke via `tools/call`. Each tool is called by posting a JSON-RPC 2.0 request to `POST http://127.0.0.1:8790/mcp` with `method: "tools/call"` and a `params` object containing the tool `name` and its `arguments`. All tool responses are wrapped in a `content` array — parse the `text` field of the first element to get the structured JSON result. The `text` value is always a pretty-printed JSON string (`JSON.stringify(payload, null, 2)`).
 
 ---
 
@@ -187,7 +187,7 @@ Instead of scanning a QR code, you can link your phone by number. This tool requ
     "content": [
       {
         "type": "text",
-        "text": "{\n  \"already_authenticated\": true,\n  \"code\": null,\n  \"status\": { \"state\": \"ready\", \"ready\": true, ... }\n}"
+        "text": "{\n  \"already_authenticated\": true,\n  \"code\": null,\n  \"status\": {\n    \"state\": \"ready\",\n    \"ready\": true,\n    \"authenticated\": true\n  }\n}"
       }
     ]
   }
@@ -330,7 +330,7 @@ Returns chats sorted by most-recent activity first. Each entry includes metadata
     "content": [
       {
         "type": "text",
-        "text": "{\n  \"ok\": true,\n  \"count\": 2,\n  \"chats\": [\n    {\n      \"id\": \"15551234567@c.us\",\n      \"name\": \"Alice\",\n      \"is_group\": false,\n      \"is_read_only\": false,\n      \"unread_count\": 3,\n      \"timestamp\": 1730812320,\n      \"archived\": false,\n      \"pinned\": true,\n      \"muted\": false,\n      \"last_message\": {\n        \"id\": \"true_15551234567@c.us_3EB0...\",\n        \"from\": \"15551234567@c.us\",\n        \"to\": \"me\",\n        \"author\": null,\n        \"from_me\": false,\n        \"type\": \"chat\",\n        \"body\": \"Hey, are you free tomorrow?\",\n        \"timestamp\": 1730812320,\n        \"has_media\": false\n      }\n    }\n  ]\n}"
+        "text": "{\n  \"ok\": true,\n  \"count\": 1,\n  \"chats\": [\n    {\n      \"id\": \"15551234567@c.us\",\n      \"name\": \"Alice\",\n      \"is_group\": false,\n      \"is_read_only\": false,\n      \"unread_count\": 3,\n      \"timestamp\": 1730812320,\n      \"archived\": false,\n      \"pinned\": true,\n      \"muted\": false,\n      \"last_message\": {\n        \"id\": \"true_15551234567@c.us_3EB0...\",\n        \"from\": \"15551234567@c.us\",\n        \"to\": \"me\",\n        \"author\": null,\n        \"from_me\": false,\n        \"type\": \"chat\",\n        \"body\": \"Hey, are you free tomorrow?\",\n        \"timestamp\": 1730812320,\n        \"has_media\": false\n      }\n    }\n  ]\n}"
       }
     ]
   }

@@ -1,7 +1,7 @@
 ---
-title: "Pair WhatsApp Using a Phone-Number Code"
+title: "Authenticate WhatsApp With a Phone-Number Pairing Code"
 sidebarTitle: "Pairing Code"
-description: "Request a numeric WhatsApp Linked Devices pairing code via POST /api/pairing-code and link your phone without scanning a QR code."
+description: "Request a numeric WhatsApp Linked Devices pairing code via POST /api/pairing-code and link your phone to the server without a QR scan."
 ---
 
 Phone-number pairing lets you link the WhatsApp MCP API server to your WhatsApp account by entering a short numeric code in the mobile app — no QR code, no camera, and no visible browser window required. This makes it the go-to method for headless servers, remote machines, and automated provisioning scripts.
@@ -173,5 +173,5 @@ The server normalizes phone numbers through the `normalizePhone` function: all n
 The country code is **required** — do not omit the leading country digits. The final digit string must be between 8 and 15 characters; anything outside that range returns an error.
 
 <Tip>
-  Pairing codes expire after a short window. If you don't enter the code in time or WhatsApp rejects it, simply call `POST /api/pairing-code` again with the same phone number to receive a fresh code.
+  Pairing codes are valid for 3 minutes (180 seconds). If you don't enter the code in time or WhatsApp rejects it, call `POST /api/pairing-code` again with the same phone number to receive a fresh code.
 </Tip>

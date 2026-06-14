@@ -1,7 +1,7 @@
 ---
-title: "GET /api/chats — List Recent WhatsApp Chats"
-sidebarTitle: "GET /api/chats"
-description: "GET /api/chats returns a sorted list of recent WhatsApp chats with metadata including unread counts, timestamps, and last message."
+title: "GET /api/chats — List Recent WhatsApp Chats by Activity"
+sidebarTitle: "List Chats"
+description: "GET /api/chats returns recent WhatsApp chats sorted by latest activity, with unread counts, pin and mute status, timestamps, and last message summaries."
 ---
 
 `GET /api/chats` fetches all WhatsApp conversations available to the authenticated account and returns the most recent ones sorted by activity. Each chat entry includes display name, group/read-only flags, unread message count, pin and mute status, and a summary of the last message. This is useful for building an inbox view or for discovering the chat IDs you need to pass to `/api/messages`.

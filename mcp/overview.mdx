@@ -1,5 +1,5 @@
 ---
-title: "WhatsApp MCP-over-HTTP Endpoint for AI Agents"
+title: "WhatsApp MCP JSON-RPC 2.0 Endpoint for AI Agents"
 sidebarTitle: "Overview"
 description: "The WhatsApp MCP API exposes a JSON-RPC 2.0 MCP endpoint at POST /mcp for integrating WhatsApp tools into AI agents and MCP-compatible clients."
 ---
@@ -12,30 +12,31 @@ The WhatsApp MCP API implements the [Model Context Protocol (MCP)](https://model
 |---|---|
 | **URL** | `POST http://127.0.0.1:8790/mcp` |
 | **Protocol** | JSON-RPC 2.0 |
-| **MCP Protocol Version** | `2024-11-05` |
+| **Default Protocol Version** | `2024-11-05` |
 | **Content-Type** | `application/json` |
-| **Session Header** | `mcp-session-id` (returned in every response) |
+| **Session Header** | `mcp-session-id` (optional in request, always returned in response) |
 | **Server Name** | `whatsapp-mcp-api` |
 | **Server Version** | `0.2.0` |
 
 <Note>
-  The host and port can be overridden with the `WHATSAPP_MCP_HOST` and `WHATSAPP_MCP_PORT` environment variables, but the default is `127.0.0.1:8790`.
+  The host and port can be overridden with the `WHATSAPP_MCP_HOST` and `WHATSAPP_MCP_PORT` environment variables, but the default is `127.0.0.1:8790`. The endpoint is **POST only** — a `GET /mcp` request returns a `404` not-found response.
 </Note>
 
 ## Supported MCP Methods
 
-All requests are `POST /mcp` with a JSON-RPC 2.0 body. The server routes on the `method` field.
+All requests are `POST /mcp` with a JSON-RPC 2.0 body. The server routes on the `method` field. There is no streaming or SSE support — every request receives a single synchronous JSON response.
 
-| Method | Description |
-|---|---|
-| `initialize` | Handshake — returns server capabilities and protocol version |
-| `notifications/initialized` | Acknowledge initialization complete (server responds with HTTP 202, no body) |
-| `tools/list` | Returns the full list of available WhatsApp tools with their input schemas |
-| `tools/call` | Invoke a specific tool by name, passing arguments as a JSON object |
+| Method | HTTP Status | Description |
+|---|---|---|
+| `initialize` | 200 | Handshake — returns server capabilities and protocol version |
+| `notifications/initialized` | 202 | Acknowledge initialization complete (empty body) |
+| `tools/list` | 200 | Returns the full list of available WhatsApp tools with their input schemas |
+| `tools/call` | 200 | Invoke a specific tool by name, passing arguments as a JSON object |
+| *(unknown method)* | 200 | Returns a JSON-RPC error with code `-32601` and message `Method not found: <method>` |
 
 ## Initialization Flow
 
-Every MCP session begins with an `initialize` handshake. Send the request once, save the `mcp-session-id` from the response header, and reuse it for all subsequent calls in the session.
+Every MCP session begins with an `initialize` handshake. Send the request once, save the `mcp-session-id` from the response header, and reuse it for all subsequent calls in the session. Pass your client's `protocolVersion` in the request — the server echoes it back verbatim. If `protocolVersion` is omitted, the server defaults to `"2024-11-05"`.
 
 ```json
 // Request — POST http://127.0.0.1:8790/mcp
@@ -52,6 +53,7 @@ Every MCP session begins with an `initialize` handshake. Send the request once, 
 
 ```json
 // Response — HTTP 200
+// Response header: mcp-session-id: 3f8a2c1e-...
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -88,7 +90,7 @@ Retrieve the full tool manifest at any time. The response includes each tool's `
 // Request
 {
   "jsonrpc": "2.0",
-  "id": 2,
+  "id": 3,
   "method": "tools/list",
   "params": {}
 }
@@ -102,7 +104,7 @@ Invoke any tool by passing its name and a matching `arguments` object. The examp
 // Request
 {
   "jsonrpc": "2.0",
-  "id": 3,
+  "id": 4,
   "method": "tools/call",
   "params": {
     "name": "whatsapp_send_message",
@@ -118,12 +120,12 @@ Invoke any tool by passing its name and a matching `arguments` object. The examp
 // Response — HTTP 200
 {
   "jsonrpc": "2.0",
-  "id": 3,
+  "id": 4,
   "result": {
     "content": [
       {
         "type": "text",
-        "text": "{...}"
+        "text": "{\n  \"ok\": true,\n  \"to\": \"15551234567\",\n  \"chat_id\": \"15551234567@c.us\",\n  \"message_id\": \"true_15551234567@c.us_3EB0...\",\n  \"timestamp\": \"2024-11-05T14:32:00.000Z\"\n}"
       }
     ]
   }
@@ -131,8 +133,34 @@ Invoke any tool by passing its name and a matching `arguments` object. The examp
 ```
 
 <Note>
-  Every tool response is wrapped in a `content` array where each item has `type: "text"` and a `text` field containing a JSON-serialized string. Parse `text` to get the structured result object.
+  Every tool response is wrapped in a `content` array where each item has `type: "text"` and a `text` field containing a pretty-printed JSON string (`JSON.stringify(payload, null, 2)`). Parse the `text` value to get the structured result object.
 </Note>
+
+## Unknown Method
+
+Any `method` value other than the four listed above returns a JSON-RPC error at HTTP 200. The error code is always `-32601`.
+
+```json
+// Request
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/unknown",
+  "params": {}
+}
+```
+
+```json
+// Response — HTTP 200
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "error": {
+    "code": -32601,
+    "message": "Method not found: tools/unknown"
+  }
+}
+```
 
 ## Session Header
 
@@ -156,6 +184,19 @@ curl -s -X POST http://127.0.0.1:8790/mcp \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 ```
 
+## CORS
+
+The server includes full CORS headers on every response, including preflight `OPTIONS` requests. Browser-based MCP clients and local dashboards can call the endpoint without any proxy configuration.
+
+| Header | Value |
+|---|---|
+| `access-control-allow-origin` | `*` |
+| `access-control-allow-methods` | `GET,POST,OPTIONS` |
+| `access-control-allow-headers` | `content-type,mcp-session-id` |
+| `access-control-expose-headers` | `mcp-session-id` |
+
+The `access-control-expose-headers` entry is what allows browser clients to read the `mcp-session-id` from the response and pass it in future requests.
+
 ## AI Agent Integration
 
 Any MCP-compatible client or AI orchestrator can point to `POST http://127.0.0.1:8790/mcp` and immediately discover all 7 WhatsApp tools via `tools/list`. The workflow is:
@@ -164,10 +205,6 @@ Any MCP-compatible client or AI orchestrator can point to `POST http://127.0.0.1
 2. **Authenticate WhatsApp** — call `whatsapp_start_auth` or `whatsapp_pairing_code` to link a phone. The session is persisted in the `.wwebjs_auth` directory so subsequent restarts skip re-authentication.
 3. **Point your agent at the endpoint** — configure the MCP client URL to `http://127.0.0.1:8790/mcp`.
 4. **Let the agent call tools** — the agent can check status, list chats, read messages, and send messages all through standard MCP `tools/call` requests.
-
-<Tip>
-  CORS headers are included on every response (`access-control-allow-origin: *`), so browser-based MCP clients and local dashboards can call the endpoint without proxy configuration.
-</Tip>
 
 <CardGroup cols={2}>
   <Card title="MCP Tool Reference" icon="wrench" href="/mcp/tools">

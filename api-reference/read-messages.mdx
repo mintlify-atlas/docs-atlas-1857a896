@@ -1,7 +1,7 @@
 ---
-title: "Read Messages from a WhatsApp Chat"
-sidebarTitle: "GET /api/messages"
-description: "GET /api/messages and POST /api/messages fetch the most recent messages from a WhatsApp chat by phone number."
+title: "GET /api/messages — Read Messages from a WhatsApp Chat"
+sidebarTitle: "Read Messages"
+description: "GET /api/messages and POST /api/messages both fetch the most recent messages from a WhatsApp chat by phone number, with optional limit control."
 ---
 
 The messages endpoints retrieve the most recent messages from a one-to-one WhatsApp chat identified by phone number. There are two ways to call the same underlying function: a `GET` variant that accepts query parameters (convenient for browser testing and curl), and a `POST` variant that accepts a JSON body (better suited for programmatic clients that already build JSON payloads). Both variants return an identical response shape.

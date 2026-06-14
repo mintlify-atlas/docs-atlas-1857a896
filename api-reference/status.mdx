@@ -1,7 +1,7 @@
 ---
-title: "GET /api/status — WhatsApp Client State"
-sidebarTitle: "GET /api/status"
-description: "GET /api/status returns the current WhatsApp Web client state including connection status, auth info, and account details."
+title: "GET /api/status — WhatsApp Web Client State & Info"
+sidebarTitle: "Status"
+description: "GET /api/status returns the WhatsApp Web client state — lifecycle, QR availability, Chrome settings, and account details for the authenticated session."
 ---
 
 The `/api/status` endpoint returns a snapshot of the internal WhatsApp Web client — its connection lifecycle state, Chrome configuration, QR availability, and the authenticated account's details when connected. Poll this endpoint to drive UI feedback or to gate downstream API calls on `ready: true`.

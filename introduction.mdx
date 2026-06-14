@@ -40,7 +40,7 @@ The REST API is available immediately after the server starts. All endpoints acc
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Server health and current WhatsApp connection status |
+| `GET` | `/` | Server health and current WhatsApp connection status (also responds at `/health`) |
 | `GET` | `/api/status` | Detailed WhatsApp client state |
 | `POST` | `/api/auth/start` | Open Chrome and start WhatsApp Web authentication |
 | `POST` | `/api/pairing-code` | Request a phone-number pairing code for Linked Devices |

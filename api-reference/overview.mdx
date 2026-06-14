@@ -1,7 +1,7 @@
 ---
-title: "WhatsApp MCP API REST Endpoints Reference"
+title: "WhatsApp MCP API — REST & MCP Endpoint Reference"
 sidebarTitle: "Overview"
-description: "Complete reference for all WhatsApp MCP API REST endpoints — status, auth, send message, list chats, read messages, logout, and QR page."
+description: "Complete reference for all WhatsApp MCP API REST endpoints: health, status, auth, pairing code, send message, list chats, read messages, logout, and QR."
 ---
 
 The WhatsApp MCP API is a local Node.js HTTP server that exposes WhatsApp Web messaging through a simple REST interface. It runs on your machine and communicates with a Chrome browser instance via [whatsapp-web.js](https://wwebjs.dev/). Because the server is local, no API keys or authentication tokens are required — every endpoint is open on localhost. All responses include `access-control-allow-origin: *` CORS headers so you can call the API from any browser or local tool.
@@ -52,7 +52,7 @@ curl -X POST http://127.0.0.1:8790/api/send \
 
 ## Response Format
 
-All REST endpoints return `application/json` with pretty-printed output (2-space indentation), except `GET /qr` which returns an HTML page. A successful response always contains an `ok: true` field at the top level (where applicable). Example:
+All REST endpoints return `application/json` with pretty-printed output (2-space indentation), except `GET /qr` which returns an HTML page. Most successful responses include an `ok: true` field at the top level — the exception is `GET /api/status`, which returns the status object directly without an `ok` wrapper. Example of a wrapped response:
 
 ```json
 {

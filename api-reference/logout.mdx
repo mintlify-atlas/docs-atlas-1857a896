@@ -1,7 +1,7 @@
 ---
-title: "POST /api/logout — End WhatsApp Session"
-sidebarTitle: "POST /api/logout"
-description: "POST /api/logout gracefully ends the WhatsApp Web session, destroys the Chrome client, and resets the server state to stopped."
+title: "POST /api/logout — End the WhatsApp Web Session Gracefully"
+sidebarTitle: "Logout"
+description: "POST /api/logout signs the device out of WhatsApp Linked Devices, shuts down the Chrome process, and resets all server state to stopped."
 ---
 
 `POST /api/logout` performs a graceful teardown of the active WhatsApp Web session. It calls `client.logout()` to sign the device out of the Linked Devices list on the WhatsApp account, then calls `client.destroy()` to close the underlying Chrome browser instance. Once the call completes, all internal state is reset to its initial `stopped` values — the client reference, QR data, ready flag, and account info are all cleared.

@@ -1,7 +1,7 @@
 ---
 title: "POST /api/auth/start — Initialize WhatsApp Authentication"
-sidebarTitle: "POST /api/auth/start"
-description: "POST /api/auth/start launches the WhatsApp Web client and Chrome, initiating the authentication flow before pairing."
+sidebarTitle: "Start Auth"
+description: "POST /api/auth/start launches Chrome and the WhatsApp Web client, kicking off the authentication flow so you can scan a QR code or request a pairing code."
 ---
 
 Before you can send messages or read chats, the WhatsApp Web client must be running and authenticated. `POST /api/auth/start` starts that process by launching a Chrome browser instance, connecting it to WhatsApp Web, and returning the current client state. Once Chrome is up, the server will emit a QR code (visible at `GET /qr`) or complete automatically if saved credentials already exist in `auth_dir`.

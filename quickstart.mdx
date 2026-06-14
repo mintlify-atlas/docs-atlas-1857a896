@@ -1,7 +1,7 @@
 ---
-title: "Get Started with WhatsApp MCP API in 5 Minutes"
+title: "WhatsApp MCP API Quickstart: Install, Pair, and Send"
 sidebarTitle: "Quickstart"
-description: "Learn how to install, start, pair your WhatsApp account, and send your first message with WhatsApp MCP API in five steps."
+description: "Install WhatsApp MCP API, pair your phone using a pairing code, and send your first message through the REST API in five guided steps."
 ---
 
 This guide walks you through everything you need to get WhatsApp MCP API running locally — from cloning the repository to sending your very first WhatsApp message via the REST API. By the end, your server will be listening on `http://127.0.0.1:8790`, your phone will be linked, and you'll have confirmed a successful message send.
@@ -60,7 +60,7 @@ This guide walks you through everything you need to get WhatsApp MCP API running
       -d '{"phone_number":"15551234567"}'
     ```
 
-    A successful response returns an 8-character numeric code, for example:
+    A successful response returns a pairing code, for example:
 
     ```json
     {
@@ -123,14 +123,14 @@ This guide walks you through everything you need to get WhatsApp MCP API running
 </Steps>
 
 <Tip>
-  Once paired, the WhatsApp session is saved in `.wwebjs_auth/session-default` (a local Chromium profile). On every subsequent `npm start`, the server restores the session automatically — **no re-pairing required**. Keep this directory intact to preserve your linked-device credentials.
+  Once paired, the WhatsApp session is saved in `.wwebjs_auth/session-default` at the repository root (i.e. `whatsapp-api/.wwebjs_auth/session-default`). On every subsequent `npm start`, the server restores the session automatically — **no re-pairing required**. Keep this directory intact to preserve your linked-device credentials.
 </Tip>
 
 <Note>
-  To verify the server is running and check the current WhatsApp connection state at any time, call the health endpoint:
+  To verify the server is running and check the current WhatsApp connection state at any time, call the root health endpoint:
 
   ```bash
-  curl http://127.0.0.1:8790/health
+  curl http://127.0.0.1:8790/
   ```
 
   The response includes `ok: true`, the MCP endpoint URL, and a full `status` object describing the WhatsApp client state (e.g. `ready`, `qr`, `authenticated`, `disconnected`).

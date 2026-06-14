@@ -1,5 +1,5 @@
 ---
-title: "Managing Persistent WhatsApp Sessions"
+title: "WhatsApp Session Persistence: Storage and Reset Guide"
 sidebarTitle: "Session"
 description: "Learn how WhatsApp MCP API stores Linked Devices sessions in .wwebjs_auth and how to preserve, reset, and troubleshoot local auth data."
 ---
@@ -59,7 +59,7 @@ Keep the backup secure — anyone with access to this directory can impersonate 
 
 ### API logout
 
-The cleanest way to end a session is through the logout endpoint. This instructs WhatsApp Web to revoke the linked device credential, then destroys the local client:
+The cleanest way to end a session is through the logout endpoint. This calls `client.logout()` followed by `client.destroy()`, revokes the linked device credential with WhatsApp, nulls the client instance, resets `state` to `"stopped"`, and clears both the pending QR code and the cached account info (`wid`, `pushname`, `platform`):
 
 ```bash
 curl -X POST http://127.0.0.1:8790/api/logout
