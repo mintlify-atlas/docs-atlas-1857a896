@@ -1,0 +1,139 @@
+---
+title: "GET /api/chats — List Recent WhatsApp Chats"
+sidebarTitle: "GET /api/chats"
+description: "GET /api/chats returns a sorted list of recent WhatsApp chats with metadata including unread counts, timestamps, and last message."
+---
+
+`GET /api/chats` fetches all WhatsApp conversations available to the authenticated account and returns the most recent ones sorted by activity. Each chat entry includes display name, group/read-only flags, unread message count, pin and mute status, and a summary of the last message. This is useful for building an inbox view or for discovering the chat IDs you need to pass to `/api/messages`.
+
+## Endpoint
+
+```
+GET /api/chats?limit=20
+```
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum number of chats to return. Must be an integer between `1` and `100`. Chats are sorted by `timestamp` (most recent first) before the limit is applied, so you always receive the freshest conversations.
+</ParamField>
+
+## Response Fields
+
+<ResponseField name="ok" type="boolean" required>
+  `true` on a successful response.
+</ResponseField>
+
+<ResponseField name="count" type="integer" required>
+  The number of chat objects returned in the `chats` array. This may be less than `limit` if the account has fewer chats than requested.
+</ResponseField>
+
+<ResponseField name="chats" type="array" required>
+  An array of chat summary objects, sorted by most recent activity first.
+
+  <Expandable title="Chat object fields">
+    <ResponseField name="id" type="string | null">
+      The serialized WhatsApp chat ID (e.g. `"15551234567@c.us"` for direct chats or `"12345678901-1234567890@g.us"` for groups).
+    </ResponseField>
+    <ResponseField name="name" type="string | null">
+      The display name of the chat (contact name or group title). `null` if unavailable.
+    </ResponseField>
+    <ResponseField name="is_group" type="boolean">
+      `true` if this is a group chat.
+    </ResponseField>
+    <ResponseField name="is_read_only" type="boolean">
+      `true` if you cannot send messages to this chat (e.g. broadcast lists, announcement groups).
+    </ResponseField>
+    <ResponseField name="unread_count" type="integer">
+      Number of unread messages in this chat. `0` if all messages have been read.
+    </ResponseField>
+    <ResponseField name="timestamp" type="integer | null">
+      Unix timestamp (seconds) of the most recent message in the chat. `null` if no messages exist.
+    </ResponseField>
+    <ResponseField name="archived" type="boolean">
+      `true` if the chat has been archived.
+    </ResponseField>
+    <ResponseField name="pinned" type="boolean">
+      `true` if the chat is pinned to the top of the inbox.
+    </ResponseField>
+    <ResponseField name="muted" type="boolean">
+      `true` if notifications for this chat have been muted.
+    </ResponseField>
+    <ResponseField name="last_message" type="object | null">
+      A summary of the most recent message in the chat, using the same shape as messages returned by `/api/messages`. `null` if the chat has no messages.
+
+      <Expandable title="last_message fields">
+        <ResponseField name="id" type="string | null">Serialized message ID.</ResponseField>
+        <ResponseField name="from" type="string | null">Sender's WhatsApp ID.</ResponseField>
+        <ResponseField name="to" type="string | null">Recipient's WhatsApp ID.</ResponseField>
+        <ResponseField name="author" type="string | null">Author ID in group chats.</ResponseField>
+        <ResponseField name="from_me" type="boolean">`true` if the message was sent by the authenticated account.</ResponseField>
+        <ResponseField name="type" type="string | null">Message type (e.g. `"chat"`, `"image"`, `"audio"`).</ResponseField>
+        <ResponseField name="body" type="string">Text content of the message. Empty string for media-only messages.</ResponseField>
+        <ResponseField name="timestamp" type="integer | null">Unix timestamp of the message.</ResponseField>
+        <ResponseField name="has_media" type="boolean">`true` if the message contains an attachment.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl "http://127.0.0.1:8790/api/chats?limit=2"
+```
+
+## Example Response
+
+```json
+{
+  "ok": true,
+  "count": 2,
+  "chats": [
+    {
+      "id": "15551234567@c.us",
+      "name": "Alice",
+      "is_group": false,
+      "is_read_only": false,
+      "unread_count": 3,
+      "timestamp": 1717250585,
+      "archived": false,
+      "pinned": true,
+      "muted": false,
+      "last_message": {
+        "id": "true_15551234567@c.us_3EB0C767D97B2C123456",
+        "from": "15551234567@c.us",
+        "to": "me@c.us",
+        "author": null,
+        "from_me": false,
+        "type": "chat",
+        "body": "Are you free tomorrow?",
+        "timestamp": 1717250585,
+        "has_media": false
+      }
+    },
+    {
+      "id": "15559876543-1609459200@g.us",
+      "name": "Team Standup",
+      "is_group": true,
+      "is_read_only": false,
+      "unread_count": 0,
+      "timestamp": 1717248000,
+      "archived": false,
+      "pinned": false,
+      "muted": true,
+      "last_message": {
+        "id": "true_15559876543-1609459200@g.us_ABCDEF1234567890",
+        "from": "15557654321@c.us",
+        "to": "15559876543-1609459200@g.us",
+        "author": "15557654321@c.us",
+        "from_me": false,
+        "type": "chat",
+        "body": "Daily sync at 9am!",
+        "timestamp": 1717248000,
+        "has_media": false
+      }
+    }
+  ]
+}
+```

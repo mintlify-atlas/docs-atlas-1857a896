@@ -1,0 +1,130 @@
+---
+title: "WhatsApp MCP API REST Endpoints Reference"
+sidebarTitle: "Overview"
+description: "Complete reference for all WhatsApp MCP API REST endpoints — status, auth, send message, list chats, read messages, logout, and QR page."
+---
+
+The WhatsApp MCP API is a local Node.js HTTP server that exposes WhatsApp Web messaging through a simple REST interface. It runs on your machine and communicates with a Chrome browser instance via [whatsapp-web.js](https://wwebjs.dev/). Because the server is local, no API keys or authentication tokens are required — every endpoint is open on localhost. All responses include `access-control-allow-origin: *` CORS headers so you can call the API from any browser or local tool.
+
+## Base URL
+
+```
+http://127.0.0.1:8790
+```
+
+The host and port are configurable through environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `WHATSAPP_MCP_HOST` | `127.0.0.1` | Bind address for the HTTP server |
+| `WHATSAPP_MCP_PORT` | `8790` | TCP port for the HTTP server |
+| `WHATSAPP_AUTH_DIR` | `../.wwebjs_auth` | Directory where session credentials are stored |
+| `WHATSAPP_CHROME_EXECUTABLE` | `C:\Program Files\Google\Chrome\Application\chrome.exe` | Path to the Chrome binary |
+| `WHATSAPP_HEADLESS` | `false` | Set to `true` to run Chrome without a visible window |
+
+## Endpoint Summary
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Health check with server info and WhatsApp status |
+| `GET` | `/health` | Alias for `GET /` |
+| `GET` | `/api/status` | WhatsApp client connection state |
+| `POST` | `/api/auth/start` | Launch Chrome and start the authentication flow |
+| `POST` | `/api/pairing-code` | Request a phone-number pairing code |
+| `POST` | `/api/send` | Send a WhatsApp text message |
+| `GET` | `/api/chats` | List recent chats sorted by timestamp |
+| `GET` | `/api/messages` | Fetch messages from a chat (query-param variant) |
+| `POST` | `/api/messages` | Fetch messages from a chat (JSON body variant) |
+| `POST` | `/api/logout` | End the WhatsApp session and stop Chrome |
+| `GET` | `/qr` | Auto-refreshing HTML page displaying the auth QR code |
+
+## Request Format
+
+`POST` endpoints expect a JSON body. Set the `Content-Type` header to `application/json`:
+
+```bash
+curl -X POST http://127.0.0.1:8790/api/send \
+  -H "Content-Type: application/json" \
+  -d '{"phone_number": "15551234567", "message": "Hello!"}'
+```
+
+`GET` endpoints accept parameters as URL query strings and require no body.
+
+## Response Format
+
+All REST endpoints return `application/json` with pretty-printed output (2-space indentation), except `GET /qr` which returns an HTML page. A successful response always contains an `ok: true` field at the top level (where applicable). Example:
+
+```json
+{
+  "ok": true,
+  "count": 3,
+  "chats": []
+}
+```
+
+## Error Responses
+
+When a request fails, the server returns a JSON error envelope modelled on JSON-RPC 2.0:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "error": {
+    "code": -32602,
+    "message": "phone_number must include country code and contain 8-15 digits"
+  }
+}
+```
+
+| HTTP status | Meaning |
+|---|---|
+| `400` | Bad input — invalid JSON body or failed parameter validation (error code `-32602`) |
+| `404` | Path not found |
+| `500` | Server-side error — WhatsApp not ready, Chrome crash, send failure, etc. (error code `-32000`) |
+
+## Phone Number Format
+
+All endpoints that accept a `phone_number` parameter normalize the value automatically:
+
+1. All non-digit characters are stripped (spaces, dashes, parentheses, `+` signs).
+2. The resulting string must be **8–15 digits** including the country code.
+
+```
++1 (555) 123-4567  →  15551234567   ✅
++44 7700 900123    →  447700900123  ✅
+555-1234           →  5551234       ❌  too short, no country code
+```
+
+Pass numbers in plain digit form or E.164 format — both work:
+
+```
+"15551234567"     plain digits
+"+15551234567"    E.164 (the + is stripped automatically)
+```
+
+## Pages in This Section
+
+<CardGroup cols={2}>
+  <Card title="GET /api/status" icon="signal" href="/api-reference/status">
+    Check the current WhatsApp client state, connection status, and account info.
+  </Card>
+  <Card title="POST /api/auth/start" icon="play" href="/api-reference/auth">
+    Launch Chrome and start the WhatsApp Web authentication flow.
+  </Card>
+  <Card title="POST /api/send" icon="paper-plane" href="/api-reference/send-message">
+    Send a text message to any WhatsApp number.
+  </Card>
+  <Card title="GET /api/chats" icon="comments" href="/api-reference/list-chats">
+    List recent chats sorted by timestamp with unread counts.
+  </Card>
+  <Card title="GET /api/messages" icon="message" href="/api-reference/read-messages">
+    Read recent messages from a chat by phone number.
+  </Card>
+  <Card title="POST /api/logout" icon="right-from-bracket" href="/api-reference/logout">
+    End the WhatsApp session and reset the server state.
+  </Card>
+  <Card title="GET /qr" icon="qrcode" href="/api-reference/qr">
+    Open the browser-based QR authentication page.
+  </Card>
+</CardGroup>

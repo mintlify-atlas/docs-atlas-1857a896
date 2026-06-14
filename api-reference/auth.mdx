@@ -1,0 +1,91 @@
+---
+title: "POST /api/auth/start — Initialize WhatsApp Authentication"
+sidebarTitle: "POST /api/auth/start"
+description: "POST /api/auth/start launches the WhatsApp Web client and Chrome, initiating the authentication flow before pairing."
+---
+
+Before you can send messages or read chats, the WhatsApp Web client must be running and authenticated. `POST /api/auth/start` starts that process by launching a Chrome browser instance, connecting it to WhatsApp Web, and returning the current client state. Once Chrome is up, the server will emit a QR code (visible at `GET /qr`) or complete automatically if saved credentials already exist in `auth_dir`.
+
+## Endpoint
+
+```
+POST /api/auth/start
+```
+
+No request body is required.
+
+## Behavior
+
+- If the client is already running or fully ready, the call returns immediately with the current state — it is safe to call multiple times.
+- If initialization is already in progress (another concurrent call), the request waits for that in-flight initialization to finish before returning.
+- If saved credentials exist from a previous session, Chrome may authenticate silently without showing a QR code and the state will transition directly from `starting` → `authenticated` → `ready`.
+
+## Response Fields
+
+The response is the same status object returned by `GET /api/status`.
+
+<ResponseField name="state" type="string" required>
+  Lifecycle state immediately after the call. Typically `starting` or `qr` for a fresh client, or `ready` if credentials were restored from disk.
+</ResponseField>
+
+<ResponseField name="ready" type="boolean" required>
+  `true` only if Chrome has fully connected and the session is usable. Most first-time calls will return `false` here while Chrome starts up.
+</ResponseField>
+
+<ResponseField name="authenticated" type="boolean" required>
+  Mirrors `ready`.
+</ResponseField>
+
+<ResponseField name="auth_dir" type="string" required>
+  Path to the directory where session credentials are stored.
+</ResponseField>
+
+<ResponseField name="chrome_executable" type="string" required>
+  Path to the Chrome binary being used.
+</ResponseField>
+
+<ResponseField name="headless" type="boolean" required>
+  Whether Chrome is running in headless mode.
+</ResponseField>
+
+<ResponseField name="has_qr" type="boolean" required>
+  `true` when a QR code is ready to scan at `GET /qr`.
+</ResponseField>
+
+<ResponseField name="last_error" type="string | null" required>
+  Last error message, or `null`.
+</ResponseField>
+
+<ResponseField name="account" type="object | null" required>
+  Account info when authenticated, `null` otherwise.
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST http://127.0.0.1:8790/api/auth/start
+```
+
+## Example Response
+
+A typical response immediately after calling the endpoint for the first time, while Chrome is still loading:
+
+```json
+{
+  "state": "starting",
+  "ready": false,
+  "authenticated": false,
+  "auth_dir": "/home/user/whatsapp-mcp-api/.wwebjs_auth",
+  "chrome_executable": "/usr/bin/google-chrome",
+  "headless": false,
+  "has_qr": false,
+  "last_error": null,
+  "account": null
+}
+```
+
+After Chrome has loaded and generated the QR code, `GET /api/status` will return `state: "qr"` and `has_qr: true`.
+
+<Tip>
+  You do not need to call `/api/auth/start` manually before using `/api/pairing-code` or any messaging endpoint. Those endpoints call `start()` internally (and `ensureReady()`) — but calling it explicitly lets you pre-warm Chrome and monitor progress via `GET /api/status` polling before issuing your first real request.
+</Tip>

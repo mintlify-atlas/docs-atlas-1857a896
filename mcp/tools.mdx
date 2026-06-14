@@ -1,0 +1,551 @@
+---
+title: "MCP Tool Reference: WhatsApp Tools for AI Agents"
+sidebarTitle: "Tools"
+description: "Full reference for all 7 MCP tools exposed by WhatsApp MCP API — status, auth, pairing, send message, list chats, read messages, and logout."
+---
+
+The MCP endpoint exposes **7 tools** that an AI agent or MCP-compatible client can discover via `tools/list` and invoke via `tools/call`. Each tool is called by posting a JSON-RPC 2.0 request to `POST http://127.0.0.1:8790/mcp` with `method: "tools/call"` and a `params` object containing the tool `name` and its `arguments`. All tool responses are wrapped in a `content` array — parse the `text` field of the first element to get the structured JSON result.
+
+---
+
+### whatsapp_status
+
+Check WhatsApp Web auth and local Chrome session status.
+
+This is a lightweight, read-only probe — it does not open Chrome or start any auth flow. Use it to inspect the current session state before deciding whether to call `whatsapp_start_auth` or `whatsapp_pairing_code`.
+
+**No input parameters.**
+
+**Request**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_status",
+    "arguments": {}
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"state\": \"ready\",\n  \"ready\": true,\n  \"authenticated\": true,\n  \"auth_dir\": \"/path/to/.wwebjs_auth\",\n  \"chrome_executable\": \"C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\",\n  \"headless\": false,\n  \"has_qr\": false,\n  \"last_error\": null,\n  \"account\": {\n    \"wid\": \"15551234567@c.us\",\n    \"pushname\": \"My Name\",\n    \"platform\": \"win32\"\n  }\n}"
+      }
+    ]
+  }
+}
+```
+
+**Response fields (inside `text` JSON)**
+
+<ResponseField name="state" type="string">
+  Current client lifecycle state. One of: `stopped`, `starting`, `qr`, `authenticated`, `ready`, `auth_failure`, `disconnected`.
+</ResponseField>
+
+<ResponseField name="ready" type="boolean">
+  `true` when the WhatsApp Web session is fully established and ready to send/receive.
+</ResponseField>
+
+<ResponseField name="authenticated" type="boolean">
+  Mirrors `ready`. `true` once the session has passed authentication.
+</ResponseField>
+
+<ResponseField name="auth_dir" type="string">
+  Filesystem path where the local WhatsApp Web session credentials are stored.
+</ResponseField>
+
+<ResponseField name="chrome_executable" type="string">
+  Path to the Chrome binary being used by Puppeteer.
+</ResponseField>
+
+<ResponseField name="headless" type="boolean">
+  Whether Chrome is running in headless mode (`WHATSAPP_HEADLESS=true`).
+</ResponseField>
+
+<ResponseField name="has_qr" type="boolean">
+  `true` if a QR code is currently available at `GET /qr` for scanning.
+</ResponseField>
+
+<ResponseField name="last_error" type="string | null">
+  Last error message from an `auth_failure` or `disconnected` event, or `null`.
+</ResponseField>
+
+<ResponseField name="account" type="object | null">
+  Account info when `ready: true`, otherwise `null`. Contains `wid` (serialized WhatsApp ID), `pushname` (display name), and `platform`.
+</ResponseField>
+
+---
+
+### whatsapp_start_auth
+
+Open Chrome and start WhatsApp Web authentication if needed.
+
+Calling this tool launches a Chrome window (or headless browser process) and begins the WhatsApp Web login flow. If the session is already authenticated, the existing status is returned immediately without re-launching Chrome. A QR code will appear in the Chrome window — scan it with WhatsApp on your phone to complete authentication.
+
+**No input parameters.**
+
+**Request**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_start_auth",
+    "arguments": {}
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"state\": \"starting\",\n  \"ready\": false,\n  \"authenticated\": false,\n  \"auth_dir\": \"/path/to/.wwebjs_auth\",\n  \"chrome_executable\": \"C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\",\n  \"headless\": false,\n  \"has_qr\": false,\n  \"last_error\": null,\n  \"account\": null\n}"
+      }
+    ]
+  }
+}
+```
+
+<Note>
+  The response reflects the state at the moment the call returns. Chrome may still be initializing — `state` will transition from `starting` → `qr` → `authenticated` → `ready` as the flow progresses. Poll `whatsapp_status` to watch for `ready: true`.
+</Note>
+
+---
+
+### whatsapp_pairing_code
+
+Generate a WhatsApp Linked Devices phone-number pairing code for this API session.
+
+Instead of scanning a QR code, you can link your phone by number. This tool requests a pairing code from WhatsApp for the given phone number. Enter the returned code in WhatsApp under **Settings → Linked Devices → Link a Device → Link with phone number instead**.
+
+**Input parameters**
+
+<ParamField body="phone_number" type="string" required>
+  Phone number with country code. Accepts raw digits or E.164 format (e.g., `"15551234567"` or `"+15551234567"`). Non-digit characters are stripped automatically. Must be 8–15 digits.
+</ParamField>
+
+**Request**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_pairing_code",
+    "arguments": {
+      "phone_number": "15551234567"
+    }
+  }
+}
+```
+
+**Response — new pairing code issued**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"already_authenticated\": false,\n  \"phone_number\": \"15551234567\",\n  \"code\": \"ABCD-1234\",\n  \"instructions\": \"WhatsApp -> Linked devices -> Link a device -> Link with phone number instead\"\n}"
+      }
+    ]
+  }
+}
+```
+
+**Response — already authenticated**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"already_authenticated\": true,\n  \"code\": null,\n  \"status\": { \"state\": \"ready\", \"ready\": true, ... }\n}"
+      }
+    ]
+  }
+}
+```
+
+**Response fields (inside `text` JSON)**
+
+<ResponseField name="already_authenticated" type="boolean">
+  `true` if the session is already ready — no pairing code was generated.
+</ResponseField>
+
+<ResponseField name="phone_number" type="string">
+  Normalized phone number (digits only) that the code was generated for.
+</ResponseField>
+
+<ResponseField name="code" type="string | null">
+  The pairing code to enter in WhatsApp. `null` when `already_authenticated` is `true`.
+</ResponseField>
+
+<ResponseField name="instructions" type="string">
+  Human-readable instructions for completing the pairing flow.
+</ResponseField>
+
+<ResponseField name="status" type="object">
+  Present only when `already_authenticated: true`. Full status object (same shape as `whatsapp_status`).
+</ResponseField>
+
+---
+
+### whatsapp_send_message
+
+Send a WhatsApp text message through the authenticated WhatsApp Web session.
+
+The phone number is normalized to digits and formatted as a WhatsApp chat ID (`<digits>@c.us`) before sending. If the session is not yet ready, the tool will wait up to 120 seconds for it to become ready before throwing an error.
+
+**Input parameters**
+
+<ParamField body="phone_number" type="string" required>
+  Recipient phone number with country code. Accepts raw digits or E.164 format (e.g., `"15551234567"`). Must be 8–15 digits after stripping non-digit characters.
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  Text content of the message to send. Must be a non-empty string.
+</ParamField>
+
+**Request**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_send_message",
+    "arguments": {
+      "phone_number": "15551234567",
+      "message": "Hello from the MCP agent!"
+    }
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"ok\": true,\n  \"to\": \"15551234567\",\n  \"chat_id\": \"15551234567@c.us\",\n  \"message_id\": \"true_15551234567@c.us_3EB0...\",\n  \"timestamp\": \"2024-11-05T14:32:00.000Z\"\n}"
+      }
+    ]
+  }
+}
+```
+
+**Response fields (inside `text` JSON)**
+
+<ResponseField name="ok" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="to" type="string">
+  Normalized recipient phone number (digits only).
+</ResponseField>
+
+<ResponseField name="chat_id" type="string">
+  Full WhatsApp chat ID used internally (`<phone>@c.us`).
+</ResponseField>
+
+<ResponseField name="message_id" type="string | null">
+  Serialized ID of the sent message as returned by WhatsApp Web.
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp of when the message was sent.
+</ResponseField>
+
+---
+
+### whatsapp_list_chats
+
+List recent WhatsApp chats for the authenticated WhatsApp Web session.
+
+Returns chats sorted by most-recent activity first. Each entry includes metadata about the chat and an optional summary of the last message. Useful for an agent to discover which conversations exist before reading specific threads.
+
+**Input parameters**
+
+<ParamField body="limit" type="integer">
+  Maximum number of chats to return. Must be between `1` and `100`. Defaults to `20`.
+</ParamField>
+
+**Request**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_list_chats",
+    "arguments": {
+      "limit": 5
+    }
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"ok\": true,\n  \"count\": 2,\n  \"chats\": [\n    {\n      \"id\": \"15551234567@c.us\",\n      \"name\": \"Alice\",\n      \"is_group\": false,\n      \"is_read_only\": false,\n      \"unread_count\": 3,\n      \"timestamp\": 1730812320,\n      \"archived\": false,\n      \"pinned\": true,\n      \"muted\": false,\n      \"last_message\": {\n        \"id\": \"true_15551234567@c.us_3EB0...\",\n        \"from\": \"15551234567@c.us\",\n        \"to\": \"me\",\n        \"author\": null,\n        \"from_me\": false,\n        \"type\": \"chat\",\n        \"body\": \"Hey, are you free tomorrow?\",\n        \"timestamp\": 1730812320,\n        \"has_media\": false\n      }\n    }\n  ]\n}"
+      }
+    ]
+  }
+}
+```
+
+**Response fields (inside `text` JSON)**
+
+<ResponseField name="ok" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="count" type="integer">
+  Number of chats returned (may be less than `limit` if fewer chats exist).
+</ResponseField>
+
+<ResponseField name="chats" type="array">
+  Array of chat summary objects, each with the following fields:
+
+  <ResponseField name="id" type="string | null">
+    Serialized WhatsApp chat ID (e.g., `15551234567@c.us` or `groupid@g.us`).
+  </ResponseField>
+
+  <ResponseField name="name" type="string | null">
+    Display name of the contact or group.
+  </ResponseField>
+
+  <ResponseField name="is_group" type="boolean">
+    `true` for group chats.
+  </ResponseField>
+
+  <ResponseField name="is_read_only" type="boolean">
+    `true` if the chat cannot be replied to.
+  </ResponseField>
+
+  <ResponseField name="unread_count" type="integer">
+    Number of unread messages in the chat.
+  </ResponseField>
+
+  <ResponseField name="timestamp" type="integer | null">
+    Unix timestamp of the most recent message activity.
+  </ResponseField>
+
+  <ResponseField name="archived" type="boolean">
+    `true` if the chat is archived.
+  </ResponseField>
+
+  <ResponseField name="pinned" type="boolean">
+    `true` if the chat is pinned.
+  </ResponseField>
+
+  <ResponseField name="muted" type="boolean">
+    `true` if notifications for this chat are muted.
+  </ResponseField>
+
+  <ResponseField name="last_message" type="object | null">
+    Summary of the most recent message (same shape as message objects in `whatsapp_read_messages`), or `null`.
+  </ResponseField>
+</ResponseField>
+
+---
+
+### whatsapp_read_messages
+
+Read the last messages from a phone-number chat.
+
+Fetches up to `limit` recent messages from the 1-on-1 chat identified by the given phone number. Messages are returned in chronological order as provided by WhatsApp Web.
+
+**Input parameters**
+
+<ParamField body="phone_number" type="string" required>
+  Phone number of the chat to read. Must include country code (e.g., `"15551234567"`). Accepts digits or E.164 format.
+</ParamField>
+
+<ParamField body="limit" type="integer">
+  Maximum number of messages to fetch. Must be between `1` and `100`. Defaults to `10`.
+</ParamField>
+
+**Request**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_read_messages",
+    "arguments": {
+      "phone_number": "15551234567",
+      "limit": 3
+    }
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"ok\": true,\n  \"chat\": {\n    \"id\": \"15551234567@c.us\",\n    \"name\": \"Alice\",\n    \"is_group\": false,\n    \"is_read_only\": false,\n    \"unread_count\": 0,\n    \"timestamp\": 1730812320,\n    \"archived\": false,\n    \"pinned\": false,\n    \"muted\": false,\n    \"last_message\": null\n  },\n  \"count\": 2,\n  \"messages\": [\n    {\n      \"id\": \"false_15551234567@c.us_3EA0...\",\n      \"from\": \"me\",\n      \"to\": \"15551234567@c.us\",\n      \"author\": null,\n      \"from_me\": true,\n      \"type\": \"chat\",\n      \"body\": \"Hello from the MCP agent!\",\n      \"timestamp\": 1730812100,\n      \"has_media\": false\n    },\n    {\n      \"id\": \"true_15551234567@c.us_3EB0...\",\n      \"from\": \"15551234567@c.us\",\n      \"to\": \"me\",\n      \"author\": null,\n      \"from_me\": false,\n      \"type\": \"chat\",\n      \"body\": \"Hey, are you free tomorrow?\",\n      \"timestamp\": 1730812320,\n      \"has_media\": false\n    }\n  ]\n}"
+      }
+    ]
+  }
+}
+```
+
+**Response fields (inside `text` JSON)**
+
+<ResponseField name="ok" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="chat" type="object">
+  Chat summary for the requested phone number (same shape as entries in `whatsapp_list_chats`).
+</ResponseField>
+
+<ResponseField name="count" type="integer">
+  Number of messages returned.
+</ResponseField>
+
+<ResponseField name="messages" type="array">
+  Array of message objects, each with:
+
+  <ResponseField name="id" type="string | null">
+    Serialized message ID.
+  </ResponseField>
+
+  <ResponseField name="from" type="string | null">
+    Sender WhatsApp ID (e.g., `15551234567@c.us`).
+  </ResponseField>
+
+  <ResponseField name="to" type="string | null">
+    Recipient WhatsApp ID.
+  </ResponseField>
+
+  <ResponseField name="author" type="string | null">
+    Author field (populated in group chats).
+  </ResponseField>
+
+  <ResponseField name="from_me" type="boolean">
+    `true` if this message was sent by the authenticated account.
+  </ResponseField>
+
+  <ResponseField name="type" type="string | null">
+    WhatsApp message type (e.g., `"chat"` for text, `"image"`, `"audio"`, etc.).
+  </ResponseField>
+
+  <ResponseField name="body" type="string">
+    Text content of the message. Empty string for non-text message types.
+  </ResponseField>
+
+  <ResponseField name="timestamp" type="integer | null">
+    Unix timestamp of when the message was sent.
+  </ResponseField>
+
+  <ResponseField name="has_media" type="boolean">
+    `true` if the message contains an attachment (image, video, document, etc.).
+  </ResponseField>
+</ResponseField>
+
+---
+
+### whatsapp_logout
+
+Logout WhatsApp Web for this local session.
+
+Calls `logout()` and `destroy()` on the WhatsApp Web client, clears all in-memory session state, and resets the client to `stopped`. The persisted auth directory (`.wwebjs_auth`) is **not** deleted — to fully remove the session, delete that directory manually.
+
+**No input parameters.**
+
+**Request**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_logout",
+    "arguments": {}
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"ok\": true\n}"
+      }
+    ]
+  }
+}
+```
+
+**Response fields (inside `text` JSON)**
+
+<ResponseField name="ok" type="boolean">
+  `true` when logout and client destruction completed successfully.
+</ResponseField>
+
+---
+
+<Warning>
+  Tools that require an active, authenticated session — `whatsapp_send_message`, `whatsapp_list_chats`, and `whatsapp_read_messages` — will return an error if the client is not in the `ready` state. Always call `whatsapp_status` first to check the session state. If `ready` is `false`, call `whatsapp_start_auth` to open Chrome and trigger the QR scan flow, or call `whatsapp_pairing_code` to link your phone by number instead.
+</Warning>

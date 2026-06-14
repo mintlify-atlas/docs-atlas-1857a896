@@ -1,0 +1,93 @@
+---
+title: "Configure WhatsApp MCP API with Environment Variables"
+sidebarTitle: "Configuration"
+description: "Customize the WhatsApp MCP API server host, port, auth directory, Chrome executable path, and headless mode using environment variables."
+---
+
+All configuration for WhatsApp MCP API is done through **environment variables** — there is no configuration file to edit. Simply set the relevant variables in your shell or process manager before running `npm start`, and the server picks them up automatically. Any variable that is not set falls back to a sensible default so the server works out of the box on Windows without any configuration at all.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `WHATSAPP_MCP_HOST` | `127.0.0.1` | The network interface the HTTP server binds to. Change to `0.0.0.0` to listen on all interfaces. |
+| `WHATSAPP_MCP_PORT` | `8790` | The TCP port the server listens on. |
+| `WHATSAPP_AUTH_DIR` | `../.wwebjs_auth` (relative to project root) | Directory where the WhatsApp Web Linked Devices session (Chromium profile) is persisted. |
+| `WHATSAPP_CHROME_EXECUTABLE` | `C:\Program Files\Google\Chrome\Application\chrome.exe` | Absolute path to the Chrome or Chromium binary that Puppeteer will launch. |
+| `WHATSAPP_HEADLESS` | `false` | Set to `true` to run Chrome in headless mode. Useful on servers without a display. |
+
+## Setting Variables
+
+Set the variables for your platform before starting the server with `npm start`.
+
+<Tabs>
+  <Tab title="PowerShell (Windows)">
+    ```powershell
+    $env:WHATSAPP_MCP_HOST = "127.0.0.1"
+    $env:WHATSAPP_MCP_PORT = "8790"
+    $env:WHATSAPP_AUTH_DIR = "C:\whatsapp\auth"
+    $env:WHATSAPP_CHROME_EXECUTABLE = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+    $env:WHATSAPP_HEADLESS = "false"
+
+    npm start
+    ```
+  </Tab>
+  <Tab title="Bash (Linux/macOS)">
+    ```bash
+    export WHATSAPP_MCP_HOST="127.0.0.1"
+    export WHATSAPP_MCP_PORT="8790"
+    export WHATSAPP_AUTH_DIR="/home/user/.whatsapp-auth"
+    export WHATSAPP_CHROME_EXECUTABLE="/usr/bin/google-chrome"
+    export WHATSAPP_HEADLESS="false"
+
+    npm start
+    ```
+
+    You can also set them inline for a single run:
+
+    ```bash
+    WHATSAPP_CHROME_EXECUTABLE=/usr/bin/chromium \
+    WHATSAPP_HEADLESS=true \
+    npm start
+    ```
+  </Tab>
+</Tabs>
+
+## Chrome / Chromium Path
+
+WhatsApp MCP API launches a real Chrome or Chromium browser via Puppeteer to drive the WhatsApp Web session. You must point `WHATSAPP_CHROME_EXECUTABLE` to an existing browser binary on your system.
+
+**Platform defaults and typical paths:**
+
+| Platform | Typical path |
+|---|---|
+| Windows | `C:\Program Files\Google\Chrome\Application\chrome.exe` *(default)* |
+| macOS | `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` |
+| Linux (Chrome) | `/usr/bin/google-chrome` |
+| Linux (Chromium) | `/usr/bin/chromium` or `/usr/bin/chromium-browser` |
+
+If Chrome is not installed at the default Windows path, or you are running on Linux/macOS, you must set `WHATSAPP_CHROME_EXECUTABLE` explicitly — otherwise the server will fail to launch the browser and the WhatsApp session cannot be established.
+
+Setting `WHATSAPP_HEADLESS=true` tells Puppeteer to run Chrome without a visible window. This is required on headless Linux servers (e.g. a VPS or Docker container) that have no graphical display available.
+
+## Auth Directory
+
+The `WHATSAPP_AUTH_DIR` variable controls where the WhatsApp Web Linked Devices session data is stored. The server uses `whatsapp-web.js`'s `LocalAuth` strategy, which saves a full Chromium user-data profile containing the linked-device credentials.
+
+- **Default location** (relative to project root): `.wwebjs_auth/session-default`
+- The directory is created automatically on first run.
+- After a successful pairing, this directory holds your linked-device credentials. The server reads it on every startup to restore the session without requiring a new pairing code.
+- **Do not delete this directory** while you want to keep the session active. Deleting it means the Linked Device is orphaned and you will need to pair again.
+- The `.wwebjs_auth` folder is intentionally excluded from git (`.gitignore`) because it contains sensitive session tokens. Back it up separately if you need to migrate your setup to another machine.
+
+<Tip>
+  When running on a Linux server without a display (e.g. a VPS), set both `WHATSAPP_HEADLESS=true` and the correct path to your Chromium binary:
+
+  ```bash
+  export WHATSAPP_CHROME_EXECUTABLE="/usr/bin/chromium-browser"
+  export WHATSAPP_HEADLESS="true"
+  npm start
+  ```
+
+  This lets Chrome run in the background without requiring a desktop environment. You can still retrieve the pairing QR code as a PNG by opening `http://<host>:<port>/qr` in a browser, or request a numeric pairing code via `POST /api/pairing-code`.
+</Tip>

@@ -1,47 +1,137 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with WhatsApp MCP API in 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Learn how to install, start, pair your WhatsApp account, and send your first message with WhatsApp MCP API in five steps."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+This guide walks you through everything you need to get WhatsApp MCP API running locally — from cloning the repository to sending your very first WhatsApp message via the REST API. By the end, your server will be listening on `http://127.0.0.1:8790`, your phone will be linked, and you'll have confirmed a successful message send.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+<Info>
+  **Prerequisites before you begin:**
+  - **Node.js >= 20** — check with `node --version`
+  - **Google Chrome** installed on the machine running the server (the server drives Chrome via Puppeteer)
+  - A **WhatsApp-registered phone number** you can access to enter the pairing code
+</Info>
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Clone the repository">
+    Clone the WhatsApp MCP API repository from GitHub:
 
     ```bash
-    npm install your-package
+    git clone https://github.com/jihvijhojhviihogyuvi/whatsapp-api.git
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Install dependencies">
+    Navigate into the server directory and install the Node.js dependencies:
 
     ```bash
-    your-cli init
+    cd whatsapp-api/whatsapp-mcp-api && npm install
+    ```
+
+    This installs `whatsapp-web.js`, `qrcode`, `qrcode-terminal`, and all other required packages listed in `package.json`.
+  </Step>
+
+  <Step title="Start the server">
+    Start the server with the default configuration:
+
+    ```bash
+    npm start
+    ```
+
+    The server starts and binds to `http://127.0.0.1:8790`. You will see output similar to:
+
+    ```
+    WhatsApp MCP API listening on http://127.0.0.1:8790
+    MCP endpoint: http://127.0.0.1:8790/mcp
+    Chrome executable: C:\Program Files\Google\Chrome\Application\chrome.exe
+    WhatsApp Web auth directory: .../.wwebjs_auth
+    ```
+
+    Chrome will open in the background so it can handle the WhatsApp Web session.
+  </Step>
+
+  <Step title="Request a pairing code">
+    With the server running, request a **Linked Devices pairing code** for your phone number. Include the full country code (no `+` prefix, no spaces or dashes):
+
+    ```bash
+    curl -X POST http://127.0.0.1:8790/api/pairing-code \
+      -H "content-type: application/json" \
+      -d '{"phone_number":"15551234567"}'
+    ```
+
+    A successful response returns an 8-character numeric code, for example:
+
+    ```json
+    {
+      "already_authenticated": false,
+      "phone_number": "15551234567",
+      "code": "ABCD-1234",
+      "instructions": "WhatsApp -> Linked devices -> Link a device -> Link with phone number instead"
+    }
+    ```
+
+    <ParamField body="phone_number" type="string" required>
+      Your WhatsApp phone number including country code, digits only. Example: `15551234567` for a US number. No `+`, spaces, or dashes.
+    </ParamField>
+  </Step>
+
+  <Step title="Link your phone">
+    Open WhatsApp on your phone and navigate to:
+
+    ```
+    Settings → Linked Devices → Link a Device → Link with phone number instead
+    ```
+
+    Enter the pairing code returned in the previous step. WhatsApp will confirm the device is linked within a few seconds, and the server logs will show:
+
+    ```
+    WhatsApp Web authenticated.
+    WhatsApp Web client ready.
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Send your first message">
+    With the session ready, send a text message to any WhatsApp number (include the full country code):
 
     ```bash
-    your-cli start
+    curl -X POST http://127.0.0.1:8790/api/send \
+      -H "content-type: application/json" \
+      -d '{"phone_number":"15551234567","message":"hello from api"}'
     ```
+
+    A successful response confirms delivery:
+
+    ```json
+    {
+      "ok": true,
+      "to": "15551234567",
+      "chat_id": "15551234567@c.us",
+      "message_id": "true_15551234567@c.us_XXXXXXXXXXXXXXXX",
+      "timestamp": "2024-11-05T12:00:00.000Z"
+    }
+    ```
+
+    <ParamField body="phone_number" type="string" required>
+      Recipient's WhatsApp phone number with country code, digits only.
+    </ParamField>
+
+    <ParamField body="message" type="string" required>
+      The text message body to send.
+    </ParamField>
   </Step>
 </Steps>
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+  Once paired, the WhatsApp session is saved in `.wwebjs_auth/session-default` (a local Chromium profile). On every subsequent `npm start`, the server restores the session automatically — **no re-pairing required**. Keep this directory intact to preserve your linked-device credentials.
 </Tip>
+
+<Note>
+  To verify the server is running and check the current WhatsApp connection state at any time, call the health endpoint:
+
+  ```bash
+  curl http://127.0.0.1:8790/health
+  ```
+
+  The response includes `ok: true`, the MCP endpoint URL, and a full `status` object describing the WhatsApp client state (e.g. `ready`, `qr`, `authenticated`, `disconnected`).
+</Note>

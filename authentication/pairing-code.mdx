@@ -1,0 +1,177 @@
+---
+title: "Pair WhatsApp Using a Phone-Number Code"
+sidebarTitle: "Pairing Code"
+description: "Request a numeric WhatsApp Linked Devices pairing code via POST /api/pairing-code and link your phone without scanning a QR code."
+---
+
+Phone-number pairing lets you link the WhatsApp MCP API server to your WhatsApp account by entering a short numeric code in the mobile app — no QR code, no camera, and no visible browser window required. This makes it the go-to method for headless servers, remote machines, and automated provisioning scripts.
+
+<Info>
+  **Prerequisites:** The server must be running (`npm start`) and Chrome or Chromium must be reachable at the path configured in `WHATSAPP_CHROME_EXECUTABLE`. The client must not already be in the `ready` state — if it is, the endpoint returns an `already_authenticated` response instead of a new code.
+</Info>
+
+## Step-by-step Process
+
+<Steps>
+  <Step title="Start the server">
+    From the `whatsapp-mcp-api/` directory, start the server:
+
+    ```bash
+    npm start
+    ```
+
+    The server starts on `http://127.0.0.1:8790` by default. Chrome is not launched yet — that happens on the next step.
+  </Step>
+
+  <Step title="Initialize the WhatsApp client (optional)">
+    Triggering auth start explicitly launches Chrome and begins loading WhatsApp Web. The pairing code endpoint will do this automatically if needed, but you can start it early:
+
+    ```bash
+    curl -X POST http://127.0.0.1:8790/api/auth/start
+    ```
+
+    Wait until `GET /api/status` reports `state: "qr"` or `state: "starting"` before proceeding — this confirms Chrome is up and WhatsApp Web has made contact.
+  </Step>
+
+  <Step title="Request the pairing code">
+    Call `POST /api/pairing-code` with your phone number. The server will request a numeric code from WhatsApp on your behalf:
+
+    ```bash
+    curl -X POST http://127.0.0.1:8790/api/pairing-code \
+      -H "content-type: application/json" \
+      -d '{"phone_number": "15551234567"}'
+    ```
+
+    A successful response looks like this:
+
+    ```json
+    {
+      "already_authenticated": false,
+      "phone_number": "15551234567",
+      "code": "12345678",
+      "instructions": "WhatsApp -> Linked devices -> Link a device -> Link with phone number instead"
+    }
+    ```
+
+    Note the value of `"code"` — you will enter this on your phone in the next step.
+  </Step>
+
+  <Step title="Enter the code on your phone">
+    Open WhatsApp on your mobile device and navigate to:
+
+    **Settings → Linked Devices → Link a Device → Link with phone number instead**
+
+    Type the numeric code exactly as returned in the `"code"` field. WhatsApp will verify the code and complete the device link.
+  </Step>
+
+  <Step title="Wait for the ready state">
+    After entering the code, poll `GET /api/status` until the client reaches the `ready` state:
+
+    ```bash
+    curl http://127.0.0.1:8790/api/status
+    ```
+
+    ```json
+    {
+      "state": "ready",
+      "ready": true,
+      "authenticated": true
+    }
+    ```
+
+    Once `state` is `"ready"`, all messaging and chat APIs are available.
+  </Step>
+</Steps>
+
+## Request
+
+**Endpoint:** `POST /api/pairing-code`
+
+<ParamField body="phone_number" type="string" required>
+  The phone number associated with your WhatsApp account. Must include the country code. Non-digit characters (spaces, dashes, `+`) are stripped automatically. The resulting digit string must be between 8 and 15 characters long.
+</ParamField>
+
+**Example request:**
+
+```bash
+curl -X POST http://127.0.0.1:8790/api/pairing-code \
+  -H "content-type: application/json" \
+  -d '{"phone_number": "15551234567"}'
+```
+
+## Response
+
+### Not yet authenticated
+
+When the server is in the `qr` or `starting` state and a new pairing code is successfully generated:
+
+<ResponseField name="already_authenticated" type="boolean">
+  `false` — the server is not yet linked.
+</ResponseField>
+<ResponseField name="phone_number" type="string">
+  The normalized (digits-only) phone number the code was issued for.
+</ResponseField>
+<ResponseField name="code" type="string">
+  The numeric pairing code to enter in the WhatsApp app.
+</ResponseField>
+<ResponseField name="instructions" type="string">
+  Human-readable navigation path for entering the code on the phone.
+</ResponseField>
+
+```json
+{
+  "already_authenticated": false,
+  "phone_number": "15551234567",
+  "code": "12345678",
+  "instructions": "WhatsApp -> Linked devices -> Link a device -> Link with phone number instead"
+}
+```
+
+### Already authenticated
+
+When the client is already in the `ready` state, no new code is generated:
+
+<ResponseField name="already_authenticated" type="boolean">
+  `true` — the server already has an active WhatsApp session.
+</ResponseField>
+<ResponseField name="code" type="null">
+  Always `null` when already authenticated.
+</ResponseField>
+<ResponseField name="status" type="object">
+  The full status object from `GET /api/status`, including `state`, `account`, and `auth_dir`.
+</ResponseField>
+
+```json
+{
+  "already_authenticated": true,
+  "code": null,
+  "status": {
+    "state": "ready",
+    "ready": true,
+    "authenticated": true,
+    "auth_dir": "/path/to/.wwebjs_auth",
+    "account": {
+      "wid": "15551234567@c.us",
+      "pushname": "Your Name",
+      "platform": "iphone"
+    }
+  }
+}
+```
+
+## Phone Number Format
+
+The server normalizes phone numbers through the `normalizePhone` function: all non-digit characters are stripped first, then the length is validated. Valid inputs include:
+
+| Format | Input example | Normalized |
+|---|---|---|
+| Digits only (US) | `15551234567` | `15551234567` |
+| E.164 (US) | `+15551234567` | `15551234567` |
+| Digits only (UK) | `447911123456` | `447911123456` |
+| E.164 (UK) | `+447911123456` | `447911123456` |
+
+The country code is **required** — do not omit the leading country digits. The final digit string must be between 8 and 15 characters; anything outside that range returns an error.
+
+<Tip>
+  Pairing codes expire after a short window. If you don't enter the code in time or WhatsApp rejects it, simply call `POST /api/pairing-code` again with the same phone number to receive a fresh code.
+</Tip>

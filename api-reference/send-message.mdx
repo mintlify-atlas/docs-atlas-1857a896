@@ -1,0 +1,78 @@
+---
+title: "POST /api/send — Send a WhatsApp Text Message"
+sidebarTitle: "POST /api/send"
+description: "POST /api/send sends a text message to a WhatsApp phone number through the authenticated Linked Devices session."
+---
+
+`POST /api/send` is the primary way to send an outgoing WhatsApp text message. It accepts a phone number and a message string, normalizes the phone number to a WhatsApp chat ID, and delivers the message through the active Linked Devices session. On success it returns metadata about the delivered message including the WhatsApp chat ID, message ID, and a send timestamp.
+
+## Endpoint
+
+```
+POST /api/send
+```
+
+## Request Body
+
+<ParamField body="phone_number" type="string" required>
+  The recipient's phone number, including the country code. Non-digit characters (spaces, dashes, `+`, parentheses) are stripped automatically. The resulting digit string must be 8–15 digits long.
+
+  Examples: `"15551234567"`, `"+44 7700 900123"`, `"447700900123"`
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  The text message to send. Must be a non-empty string. Emoji, Unicode, and multi-line text are supported.
+</ParamField>
+
+## Response Fields
+
+<ResponseField name="ok" type="boolean" required>
+  `true` on a successful send.
+</ResponseField>
+
+<ResponseField name="to" type="string" required>
+  The normalized phone number (digits only) that the message was sent to.
+</ResponseField>
+
+<ResponseField name="chat_id" type="string" required>
+  The WhatsApp chat identifier for the recipient, in the format `{phone}@c.us` (e.g. `"15551234567@c.us"`).
+</ResponseField>
+
+<ResponseField name="message_id" type="string | null" required>
+  The serialized WhatsApp message ID assigned by the server. `null` if the ID could not be extracted from the response.
+</ResponseField>
+
+<ResponseField name="timestamp" type="string" required>
+  ISO 8601 timestamp of when the send was initiated on the server (e.g. `"2024-06-01T14:23:05.123Z"`).
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST http://127.0.0.1:8790/api/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "15551234567",
+    "message": "Hello from the WhatsApp MCP API!"
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "ok": true,
+  "to": "15551234567",
+  "chat_id": "15551234567@c.us",
+  "message_id": "true_15551234567@c.us_3EB0C767D97B2C123456",
+  "timestamp": "2024-06-01T14:23:05.123Z"
+}
+```
+
+<Warning>
+  The server must be in the `ready` state before calling this endpoint. If the WhatsApp client is not ready, the server calls `ensureReady()` which waits up to **120 seconds** for the client to become ready before returning a `500` error. Start the auth flow with `POST /api/auth/start` and complete QR or pairing-code authentication first.
+</Warning>
+
+<Note>
+  The `ensureReady()` wait applies to temporary in-progress states (e.g. `starting`, `authenticated`). If the client is in `auth_failure` or has never been started, the error is returned immediately without waiting the full timeout.
+</Note>

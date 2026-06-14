@@ -1,0 +1,145 @@
+---
+title: "Managing Persistent WhatsApp Sessions"
+sidebarTitle: "Session"
+description: "Learn how WhatsApp MCP API stores Linked Devices sessions in .wwebjs_auth and how to preserve, reset, and troubleshoot local auth data."
+---
+
+Once you have completed the one-time pairing step, WhatsApp MCP API saves the full Chrome user profile — including the WhatsApp Web session credentials — to a local directory called `.wwebjs_auth/session-default`. Every subsequent server restart loads this saved profile and reconnects to WhatsApp automatically, without requiring a new QR scan or pairing code.
+
+## Session Storage Location
+
+The session directory is created relative to the project root by default, but can be relocated using an environment variable:
+
+| Setting | Value |
+|---|---|
+| Default path | `.wwebjs_auth/session-default/` (relative to the project root) |
+| Environment variable | `WHATSAPP_AUTH_DIR` — overrides the base `.wwebjs_auth` directory |
+
+The directory is a standard **Chromium user data directory** managed entirely by whatsapp-web.js and Puppeteer. Do not manually edit, rename, or move individual files inside it — doing so will corrupt the session and force a full re-pair.
+
+The `.wwebjs_auth` folder is intentionally excluded from version control (git-ignored) because it contains sensitive Linked Device credentials that are equivalent to a logged-in WhatsApp session.
+
+<Note>
+  Set `WHATSAPP_AUTH_DIR` to an absolute path to change where sessions are stored — for example, when running multiple isolated server instances side by side, each pointed at a different auth directory and a different phone number.
+</Note>
+
+## Auto-Reconnect
+
+When the server starts and `.wwebjs_auth/session-default` already exists, the `Client` is initialized with a `LocalAuth` strategy that loads the saved Chromium profile. Chrome opens the saved session, WhatsApp Web recognizes the device credentials, and the client state transitions through:
+
+```
+starting → authenticated → ready
+```
+
+No user interaction is required. The server is fully operational as soon as `state` reaches `"ready"`, which you can verify with:
+
+```bash
+curl http://127.0.0.1:8790/api/status
+```
+
+## Backing Up the Session
+
+Because the session is a plain directory on disk, you can back it up and restore it like any other folder:
+
+**To back up:**
+
+```bash
+cp -r .wwebjs_auth /path/to/your/backup/location/
+```
+
+**To restore on a new machine or after a wipe:**
+
+1. Copy your backed-up `.wwebjs_auth` folder to the project root (or wherever `WHATSAPP_AUTH_DIR` points).
+2. Start the server normally with `npm start`.
+3. The session auto-reconnects without re-pairing.
+
+Keep the backup secure — anyone with access to this directory can impersonate your WhatsApp Linked Device.
+
+## Resetting the Session / Logging Out
+
+### API logout
+
+The cleanest way to end a session is through the logout endpoint. This instructs WhatsApp Web to revoke the linked device credential, then destroys the local client:
+
+```bash
+curl -X POST http://127.0.0.1:8790/api/logout
+```
+
+```json
+{
+  "ok": true
+}
+```
+
+After logout, the client state returns to `"stopped"`. You can then re-pair using the [pairing code flow](/authentication/pairing-code).
+
+### Manual reset
+
+If the server is not running, or if the session is corrupted, delete the auth directory directly and restart:
+
+```bash
+# Stop the server first, then:
+rm -rf .wwebjs_auth
+
+# Restart
+npm start
+```
+
+On the next start Chrome will find no saved profile and WhatsApp Web will prompt for a new device link.
+
+## Troubleshooting
+
+<Accordion title="Server stuck in 'starting' state">
+  Chrome may not be found at the configured path. Check the value of `WHATSAPP_CHROME_EXECUTABLE` — it defaults to the Windows path `C:\Program Files\Google\Chrome\Application\chrome.exe`. On Linux or macOS, set the variable to the correct binary location:
+
+  ```bash
+  WHATSAPP_CHROME_EXECUTABLE=/usr/bin/google-chrome npm start
+  # or for Chromium:
+  WHATSAPP_CHROME_EXECUTABLE=/usr/bin/chromium-browser npm start
+  ```
+
+  You can also confirm the configured path by calling `GET /api/status` and checking the `chrome_executable` field in the response.
+</Accordion>
+
+<Accordion title="Auth failure after restart">
+  A saved session can become stale if the linked device was removed from WhatsApp on the phone, or if too much time passed since the last connection. The `state` will be `"auth_failure"` and `last_error` will contain a reason string.
+
+  To recover, log out cleanly and re-pair:
+
+  ```bash
+  curl -X POST http://127.0.0.1:8790/api/logout
+  # Then pair again:
+  curl -X POST http://127.0.0.1:8790/api/pairing-code \
+    -H "content-type: application/json" \
+    -d '{"phone_number": "15551234567"}'
+  ```
+</Accordion>
+
+<Accordion title="'not ready yet' errors on API calls">
+  Any messaging or chat endpoint called before the client reaches `"ready"` will return an error. The client may still be authenticating — especially on first launch when Chrome is starting up.
+
+  Poll `GET /api/status` and wait until `state` is `"ready"` before issuing other API calls:
+
+  ```bash
+  curl http://127.0.0.1:8790/api/status
+  ```
+
+  ```json
+  {
+    "state": "ready",
+    "ready": true
+  }
+  ```
+</Accordion>
+
+<Accordion title="Headless Chrome on Linux">
+  By default `WHATSAPP_HEADLESS` is `false`, which means Chrome tries to open a visible window. On a headless Linux server with no display, this will fail.
+
+  Set `WHATSAPP_HEADLESS=true` to run Chrome in headless mode:
+
+  ```bash
+  WHATSAPP_HEADLESS=true npm start
+  ```
+
+  If you still encounter display errors, ensure a virtual framebuffer (e.g., `Xvfb`) is running, or use a Docker image that includes all Chromium dependencies. Also confirm that the `--disable-dev-shm-usage` and `--disable-gpu` flags are active — they are included in the server's Puppeteer configuration by default.
+</Accordion>

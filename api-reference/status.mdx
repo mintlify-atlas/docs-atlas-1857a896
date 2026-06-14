@@ -1,0 +1,118 @@
+---
+title: "GET /api/status — WhatsApp Client State"
+sidebarTitle: "GET /api/status"
+description: "GET /api/status returns the current WhatsApp Web client state including connection status, auth info, and account details."
+---
+
+The `/api/status` endpoint returns a snapshot of the internal WhatsApp Web client — its connection lifecycle state, Chrome configuration, QR availability, and the authenticated account's details when connected. Poll this endpoint to drive UI feedback or to gate downstream API calls on `ready: true`.
+
+## Endpoint
+
+```
+GET /api/status
+```
+
+No request parameters are required.
+
+## Response Fields
+
+<ResponseField name="state" type="string" required>
+  The current lifecycle state of the WhatsApp Web client. Possible values:
+
+  | Value | Meaning |
+  |---|---|
+  | `stopped` | Client has not been started yet (or was logged out) |
+  | `starting` | Chrome is launching and `client.initialize()` is running |
+  | `qr` | A QR code has been generated; waiting for the user to scan it |
+  | `authenticated` | QR was scanned; session credentials are being saved |
+  | `ready` | Fully connected and ready to send/receive messages |
+  | `auth_failure` | Authentication failed; see `last_error` for details |
+  | `disconnected` | Client was previously ready but lost the connection |
+</ResponseField>
+
+<ResponseField name="ready" type="boolean" required>
+  `true` when the client is in the `ready` state and all messaging endpoints are safe to call.
+</ResponseField>
+
+<ResponseField name="authenticated" type="boolean" required>
+  Mirrors `ready`. Set to `true` at the same time the `ready` flag becomes `true`.
+</ResponseField>
+
+<ResponseField name="auth_dir" type="string" required>
+  Absolute filesystem path to the directory where [whatsapp-web.js](https://wwebjs.dev/) stores `LocalAuth` session credentials. Defaults to `../.wwebjs_auth` relative to the project root, configurable via `WHATSAPP_AUTH_DIR`.
+</ResponseField>
+
+<ResponseField name="chrome_executable" type="string" required>
+  Absolute path to the Chrome binary that will be launched by Puppeteer. Configurable via `WHATSAPP_CHROME_EXECUTABLE`.
+</ResponseField>
+
+<ResponseField name="headless" type="boolean" required>
+  `true` when Chrome is configured to run without a visible window (`WHATSAPP_HEADLESS=true`). Defaults to `false`.
+</ResponseField>
+
+<ResponseField name="has_qr" type="boolean" required>
+  `true` when a QR code is currently available at `GET /qr`. Becomes `false` once the client reaches the `ready` state (the QR is cleared on successful auth).
+</ResponseField>
+
+<ResponseField name="last_error" type="string | null" required>
+  The most recent error message, or `null` if no error has occurred. Populated on `auth_failure` and `disconnected` states.
+</ResponseField>
+
+<ResponseField name="account" type="object | null" required>
+  Account details for the authenticated WhatsApp identity. `null` when the client is not yet ready.
+
+  <Expandable title="account fields">
+    <ResponseField name="wid" type="string | null">
+      The serialized WhatsApp ID of the logged-in account (e.g. `"15551234567@c.us"`).
+    </ResponseField>
+    <ResponseField name="pushname" type="string | null">
+      The display name the account uses on WhatsApp.
+    </ResponseField>
+    <ResponseField name="platform" type="string | null">
+      The platform reported by WhatsApp Web (e.g. `"smba"`, `"android"`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl http://127.0.0.1:8790/api/status
+```
+
+## Example Response
+
+The following shows a fully authenticated, ready client:
+
+```json
+{
+  "state": "ready",
+  "ready": true,
+  "authenticated": true,
+  "auth_dir": "/home/user/whatsapp-mcp-api/.wwebjs_auth",
+  "chrome_executable": "/usr/bin/google-chrome",
+  "headless": false,
+  "has_qr": false,
+  "last_error": null,
+  "account": {
+    "wid": "15551234567@c.us",
+    "pushname": "Alice",
+    "platform": "smba"
+  }
+}
+```
+
+<Note>
+  `GET /` and `GET /health` return the same status object nested inside a larger envelope that also includes the server `name` and MCP endpoint URL:
+
+  ```json
+  {
+    "ok": true,
+    "name": "whatsapp-mcp-api",
+    "mcp": "http://127.0.0.1:8790/mcp",
+    "status": { ... }
+  }
+  ```
+
+  Use `GET /api/status` when you only need the WhatsApp client state.
+</Note>

@@ -1,0 +1,65 @@
+---
+title: "POST /api/logout — End WhatsApp Session"
+sidebarTitle: "POST /api/logout"
+description: "POST /api/logout gracefully ends the WhatsApp Web session, destroys the Chrome client, and resets the server state to stopped."
+---
+
+`POST /api/logout` performs a graceful teardown of the active WhatsApp Web session. It calls `client.logout()` to sign the device out of the Linked Devices list on the WhatsApp account, then calls `client.destroy()` to close the underlying Chrome browser instance. Once the call completes, all internal state is reset to its initial `stopped` values — the client reference, QR data, ready flag, and account info are all cleared.
+
+## Endpoint
+
+```
+POST /api/logout
+```
+
+No request body is required.
+
+## Behavior
+
+The logout sequence runs these steps in order:
+
+1. `client.logout()` — deregisters this session from the WhatsApp account's Linked Devices list.
+2. `client.destroy()` — shuts down the Puppeteer/Chrome process.
+3. Internal state reset:
+   - `state` → `"stopped"`
+   - `ready` → `false`
+   - `client` → `null`
+   - `lastQr` → `null`
+   - `info` → `null`
+
+If the client was not running when logout is called, the server still resets state and returns `{ok: true}` without error.
+
+## Response Fields
+
+<ResponseField name="ok" type="boolean" required>
+  Always `true` on a successful logout.
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST http://127.0.0.1:8790/api/logout
+```
+
+## Example Response
+
+```json
+{
+  "ok": true
+}
+```
+
+<Warning>
+  `POST /api/logout` does **not** delete the `.wwebjs_auth` directory on disk. The saved session credentials remain on the filesystem. This means if you call `POST /api/auth/start` again after logout, WhatsApp may restore the session automatically without requiring a new QR scan.
+
+  To perform a full reset and force re-authentication from scratch, also delete the auth directory after logging out:
+
+  ```bash
+  # After calling POST /api/logout
+  rm -rf /path/to/.wwebjs_auth
+  ```
+</Warning>
+
+<Tip>
+  After logout, you can reconnect by calling `POST /api/auth/start` followed by `POST /api/pairing-code` (or opening `GET /qr` in a browser). There is no need to restart the server process itself.
+</Tip>

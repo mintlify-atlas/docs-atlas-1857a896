@@ -1,0 +1,64 @@
+---
+title: "GET /qr — Browser-Based WhatsApp QR Authentication"
+sidebarTitle: "GET /qr"
+description: "GET /qr serves an auto-refreshing HTML page showing the WhatsApp Web QR code for browser-based Linked Devices authentication."
+---
+
+`GET /qr` is a browser-friendly alternative to phone-number pairing. Instead of returning JSON, it serves a self-contained HTML page that renders the current WhatsApp Web QR code as an image and refreshes itself every 5 seconds. This makes it easy to authenticate on any machine where you have access to both the server and a web browser — just open the URL, scan the code with your phone, and the page will reflect the new `ready` state on its next refresh.
+
+## Endpoint
+
+```
+GET /qr
+```
+
+This endpoint returns `text/html`, not `application/json`.
+
+## Behavior
+
+The server generates the HTML page dynamically on each request:
+
+- If a QR code is available (`has_qr: true`), it is rendered as a `360×360` PNG image embedded in the page as a base64 data URL (`<img src="data:image/png;base64,..."/>`).
+- If no QR code is available yet (client not started or already authenticated), the page shows the message: *"No QR is available yet. Start auth, then refresh this page."*
+- The current `state` value from the WhatsApp client is displayed below the image so you can monitor progress without a separate API call.
+- A `<meta http-equiv="refresh" content="5">` tag causes the browser to reload the page every 5 seconds automatically.
+
+## How to Use
+
+<Steps>
+  <Step title="Start the server">
+    Make sure the WhatsApp MCP API server is running and reachable at `http://127.0.0.1:8790`.
+  </Step>
+  <Step title="Start the authentication flow">
+    Call `POST /api/auth/start` to launch Chrome and begin WhatsApp Web initialization:
+
+    ```bash
+    curl -X POST http://127.0.0.1:8790/api/auth/start
+    ```
+
+    Wait for the response to show `state: "qr"` or poll `GET /api/status` until `has_qr` becomes `true`.
+  </Step>
+  <Step title="Open the QR page in a browser">
+    Navigate to the QR page in any web browser on the same machine (or any machine with network access to the server):
+
+    ```
+    http://127.0.0.1:8790/qr
+    ```
+
+    The QR code image will appear on the page.
+  </Step>
+  <Step title="Scan the QR code with WhatsApp">
+    On your phone, open WhatsApp and go to **Settings → Linked devices → Link a device**. Point the camera at the QR code displayed in your browser.
+  </Step>
+  <Step title="Authentication completes">
+    After a successful scan, the WhatsApp client transitions through `authenticated` → `ready`. The page continues auto-refreshing every 5 seconds and will show `state: ready` once the connection is established.
+  </Step>
+</Steps>
+
+<Note>
+  WhatsApp QR codes expire after a short period. If the code expires before you scan it, the server automatically generates a new one. Because the page refreshes every 5 seconds, a fresh QR code will appear within seconds — no manual action is needed.
+</Note>
+
+<Tip>
+  For headless server environments where no browser is available, use **phone-number pairing** instead. Call `POST /api/auth/start` to start Chrome, then `POST /api/pairing-code` with your phone number to receive an 8-character code you can enter directly in the WhatsApp app under **Settings → Linked devices → Link with phone number instead**.
+</Tip>

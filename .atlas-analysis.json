@@ -1,0 +1,88 @@
+{
+  "projectType": "api-service",
+  "projectName": "WhatsApp MCP API",
+  "projectDescription": "A local REST and MCP server that links to a personal WhatsApp account via Linked Devices and exposes message sending, chat listing, and message reading through HTTP API calls.",
+  "theme": "luma",
+  "primaryColor": "#25D366",
+  "lightColor": "#dcfce7",
+  "darkColor": "#128C7E",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "authentication/overview",
+              "authentication/pairing-code",
+              "authentication/session"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "REST API",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/status",
+              "api-reference/auth",
+              "api-reference/send-message",
+              "api-reference/list-chats",
+              "api-reference/read-messages",
+              "api-reference/logout",
+              "api-reference/qr"
+            ]
+          },
+          {
+            "group": "MCP Endpoint",
+            "pages": [
+              "mcp/overview",
+              "mcp/tools"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "WhatsApp Linked Devices pairing via numeric phone code (no QR scan required in headless use)",
+    "Persistent local session stored in .wwebjs_auth — no re-authentication across restarts",
+    "REST API for sending messages, listing chats, and reading message history",
+    "MCP-over-HTTP endpoint compatible with AI agent tooling",
+    "QR code page at /qr for browser-based authentication fallback",
+    "Configurable via environment variables (host, port, auth dir, Chrome path, headless mode)",
+    "CORS-enabled responses for local tool and browser integration"
+  ],
+  "publicApiSurface": [
+    "GET /health — server health and WhatsApp status",
+    "GET /api/status — detailed WhatsApp Web client state",
+    "POST /api/auth/start — initialize WhatsApp Web authentication",
+    "POST /api/pairing-code — request a numeric Linked Devices pairing code",
+    "POST /api/send — send a text message to a phone number",
+    "GET /api/chats — list recent chats (query param: limit)",
+    "GET /api/messages — read messages from a chat (query params: phone_number, limit)",
+    "POST /api/messages — read messages from a chat (JSON body)",
+    "POST /api/logout — logout and destroy the current WhatsApp session",
+    "GET /qr — browser page showing the QR code for authentication",
+    "POST /mcp — MCP-over-HTTP endpoint (JSON-RPC 2.0)",
+    "MCP tool: whatsapp_status",
+    "MCP tool: whatsapp_start_auth",
+    "MCP tool: whatsapp_pairing_code",
+    "MCP tool: whatsapp_send_message",
+    "MCP tool: whatsapp_list_chats",
+    "MCP tool: whatsapp_read_messages",
+    "MCP tool: whatsapp_logout"
+  ]
+}

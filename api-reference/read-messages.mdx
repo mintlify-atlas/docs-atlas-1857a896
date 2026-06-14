@@ -1,0 +1,197 @@
+---
+title: "Read Messages from a WhatsApp Chat"
+sidebarTitle: "GET /api/messages"
+description: "GET /api/messages and POST /api/messages fetch the most recent messages from a WhatsApp chat by phone number."
+---
+
+The messages endpoints retrieve the most recent messages from a one-to-one WhatsApp chat identified by phone number. There are two ways to call the same underlying function: a `GET` variant that accepts query parameters (convenient for browser testing and curl), and a `POST` variant that accepts a JSON body (better suited for programmatic clients that already build JSON payloads). Both variants return an identical response shape.
+
+---
+
+## GET Variant
+
+Use query parameters to specify the target chat and the number of messages to fetch.
+
+### Endpoint
+
+```
+GET /api/messages?phone_number=15551234567&limit=10
+```
+
+### Query Parameters
+
+<ParamField query="phone_number" type="string" required>
+  The phone number of the contact whose chat you want to read. Must include the country code. Non-digit characters are stripped automatically, and the result must be 8–15 digits.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="10">
+  Maximum number of messages to return. Must be between `1` and `100`. Messages are returned in chronological order (oldest first within the returned window).
+</ParamField>
+
+### Example Request
+
+```bash
+curl "http://127.0.0.1:8790/api/messages?phone_number=15551234567&limit=5"
+```
+
+---
+
+## POST Variant
+
+Use a JSON request body — functionally identical to the GET variant.
+
+### Endpoint
+
+```
+POST /api/messages
+```
+
+### Body Parameters
+
+<ParamField body="phone_number" type="string" required>
+  The phone number of the contact whose chat you want to read. Must include the country code. Non-digit characters are stripped automatically.
+</ParamField>
+
+<ParamField body="limit" type="integer" default="10">
+  Maximum number of messages to return. Must be between `1` and `100`.
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST http://127.0.0.1:8790/api/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "15551234567",
+    "limit": 5
+  }'
+```
+
+---
+
+## Response Fields
+
+<ResponseField name="ok" type="boolean" required>
+  `true` on a successful response.
+</ResponseField>
+
+<ResponseField name="chat" type="object" required>
+  A chat summary object for the conversation identified by `phone_number`. Has the same shape as the chat objects in `GET /api/chats`.
+
+  <Expandable title="Chat object fields">
+    <ResponseField name="id" type="string | null">Serialized WhatsApp chat ID (e.g. `"15551234567@c.us"`).</ResponseField>
+    <ResponseField name="name" type="string | null">Display name of the chat.</ResponseField>
+    <ResponseField name="is_group" type="boolean">`true` if this is a group chat.</ResponseField>
+    <ResponseField name="is_read_only" type="boolean">`true` if the chat is read-only.</ResponseField>
+    <ResponseField name="unread_count" type="integer">Number of unread messages.</ResponseField>
+    <ResponseField name="timestamp" type="integer | null">Unix timestamp of the most recent message.</ResponseField>
+    <ResponseField name="archived" type="boolean">`true` if the chat is archived.</ResponseField>
+    <ResponseField name="pinned" type="boolean">`true` if the chat is pinned.</ResponseField>
+    <ResponseField name="muted" type="boolean">`true` if notifications are muted.</ResponseField>
+    <ResponseField name="last_message" type="object | null">Summary of the most recent message. `null` if no messages exist.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="count" type="integer" required>
+  Number of message objects returned in the `messages` array.
+</ResponseField>
+
+<ResponseField name="messages" type="array" required>
+  An array of message summary objects from the chat, ordered chronologically (oldest first).
+
+  <Expandable title="Message object fields">
+    <ResponseField name="id" type="string | null">
+      Serialized WhatsApp message ID. `null` if the ID could not be extracted.
+    </ResponseField>
+    <ResponseField name="from" type="string | null">
+      WhatsApp ID of the message sender (e.g. `"15551234567@c.us"`). `null` for some system messages.
+    </ResponseField>
+    <ResponseField name="to" type="string | null">
+      WhatsApp ID of the recipient or group. `null` if unavailable.
+    </ResponseField>
+    <ResponseField name="author" type="string | null">
+      In group chats, the WhatsApp ID of the individual who sent the message. `null` for direct chats.
+    </ResponseField>
+    <ResponseField name="from_me" type="boolean">
+      `true` if the message was sent by the authenticated account.
+    </ResponseField>
+    <ResponseField name="type" type="string | null">
+      The WhatsApp message type. Common values: `"chat"` (text), `"image"`, `"audio"`, `"video"`, `"document"`, `"sticker"`. `null` for unrecognized types.
+    </ResponseField>
+    <ResponseField name="body" type="string">
+      The text content of the message. For media messages this may be the caption. Empty string (`""`) if there is no text content.
+    </ResponseField>
+    <ResponseField name="timestamp" type="integer | null">
+      Unix timestamp (seconds) of when the message was sent. `null` if unavailable.
+    </ResponseField>
+    <ResponseField name="has_media" type="boolean">
+      `true` if the message contains a media attachment (image, audio, video, document, etc.).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "ok": true,
+  "chat": {
+    "id": "15551234567@c.us",
+    "name": "Alice",
+    "is_group": false,
+    "is_read_only": false,
+    "unread_count": 0,
+    "timestamp": 1717250585,
+    "archived": false,
+    "pinned": false,
+    "muted": false,
+    "last_message": {
+      "id": "true_15551234567@c.us_3EB0C767D97B2C123456",
+      "from": "15551234567@c.us",
+      "to": "me@c.us",
+      "author": null,
+      "from_me": false,
+      "type": "chat",
+      "body": "Are you free tomorrow?",
+      "timestamp": 1717250585,
+      "has_media": false
+    }
+  },
+  "count": 3,
+  "messages": [
+    {
+      "id": "true_me@c.us_AA11BB22CC33DD44EE55",
+      "from": "me@c.us",
+      "to": "15551234567@c.us",
+      "author": null,
+      "from_me": true,
+      "type": "chat",
+      "body": "Hey Alice, just checking in!",
+      "timestamp": 1717249200,
+      "has_media": false
+    },
+    {
+      "id": "true_15551234567@c.us_FF66GG77HH88II99JJ00",
+      "from": "15551234567@c.us",
+      "to": "me@c.us",
+      "author": null,
+      "from_me": false,
+      "type": "image",
+      "body": "Check out this photo",
+      "timestamp": 1717250100,
+      "has_media": true
+    },
+    {
+      "id": "true_15551234567@c.us_3EB0C767D97B2C123456",
+      "from": "15551234567@c.us",
+      "to": "me@c.us",
+      "author": null,
+      "from_me": false,
+      "type": "chat",
+      "body": "Are you free tomorrow?",
+      "timestamp": 1717250585,
+      "has_media": false
+    }
+  ]
+}
+```

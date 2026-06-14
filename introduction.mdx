@@ -1,0 +1,76 @@
+---
+title: "WhatsApp MCP API: Send Messages via Local REST & MCP"
+sidebarTitle: "Introduction"
+description: "WhatsApp MCP API is a self-hosted Node.js server that exposes WhatsApp messaging over REST and MCP-over-HTTP using the unofficial whatsapp-web.js library."
+---
+
+WhatsApp MCP API is a self-hosted Node.js server that links your personal WhatsApp account via the **Linked Devices** feature and exposes full messaging capabilities over two interfaces: a conventional REST API and an MCP-over-HTTP endpoint. Once your phone is paired, the server manages the WhatsApp Web session entirely in the background — no browser tab to keep open, no repeated QR scanning — so your scripts, automations, and AI agents can send and read WhatsApp messages through straightforward HTTP calls.
+
+## What It Does
+
+WhatsApp MCP API wraps [whatsapp-web.js](https://wwebjs.dev/), an unofficial WhatsApp Web client that drives a local Chrome/Chromium browser via Puppeteer. On first run the server requests a numeric **pairing code** (or generates a QR code) so you can link the server as a Linked Device on your WhatsApp account. After that, the session is persisted in a local directory (`.wwebjs_auth/session-default`) using `LocalAuth`, so subsequent server restarts reconnect automatically without any manual step.
+
+The HTTP layer is built on Node.js's built-in `node:http` module — no Express or other framework. The server binds to `127.0.0.1:8790` by default and exposes:
+
+- **REST endpoints** under `/api/*` for sending messages, listing chats, reading message history, managing auth, and checking status.
+- **An MCP endpoint** at `POST /mcp` that implements the [Model Context Protocol](https://modelcontextprotocol.io/) (protocol version `2024-11-05`), making all WhatsApp operations available as callable tools to any MCP-compatible AI agent or orchestrator.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Automated Notifications" icon="bell">
+    Send WhatsApp alerts, reminders, or status updates from scripts, CI/CD pipelines, or monitoring systems by posting to the `/api/send` endpoint.
+  </Card>
+  <Card title="AI Agent Tool Use (MCP)" icon="robot">
+    Connect any MCP-compatible AI agent (such as Claude Desktop) to `POST /mcp` and let the agent send messages, list chats, or read conversation history as native tool calls.
+  </Card>
+  <Card title="Chat History Reading" icon="message">
+    Fetch recent chats and messages via `/api/chats` and `/api/messages` for logging, analysis, archiving, or building a search index over your WhatsApp history.
+  </Card>
+  <Card title="Local Scripting & Automation" icon="code">
+    Integrate WhatsApp messaging into any local workflow — shell scripts, Python bots, Node.js automation — using simple `curl` commands or any HTTP client.
+  </Card>
+</CardGroup>
+
+## Interfaces
+
+### REST API
+
+The REST API is available immediately after the server starts. All endpoints accept and return JSON. The base URL is `http://127.0.0.1:8790` (configurable via environment variables).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Server health and current WhatsApp connection status |
+| `GET` | `/api/status` | Detailed WhatsApp client state |
+| `POST` | `/api/auth/start` | Open Chrome and start WhatsApp Web authentication |
+| `POST` | `/api/pairing-code` | Request a phone-number pairing code for Linked Devices |
+| `POST` | `/api/send` | Send a text message to a phone number |
+| `GET` | `/api/chats` | List recent chats (supports `?limit=` query param) |
+| `GET` | `/api/messages` | Read messages from a chat (supports `?phone_number=` and `?limit=`) |
+| `POST` | `/api/messages` | Read messages from a chat (JSON body) |
+| `POST` | `/api/logout` | Log out and clear the current WhatsApp session |
+| `GET` | `/qr` | Browser-viewable QR code page (auto-refreshes every 5 s) |
+
+### MCP Endpoint
+
+The MCP endpoint at `POST /mcp` follows the [Model Context Protocol spec](https://modelcontextprotocol.io/) (version `2024-11-05`). It accepts JSON-RPC 2.0 messages and supports session tracking via the `mcp-session-id` request/response header.
+
+The following tools are exposed through the MCP interface:
+
+| Tool | Description |
+|------|-------------|
+| `whatsapp_status` | Check WhatsApp Web auth and local Chrome session status |
+| `whatsapp_start_auth` | Open Chrome and start WhatsApp Web authentication if needed |
+| `whatsapp_pairing_code` | Generate a phone-number pairing code for Linked Devices |
+| `whatsapp_send_message` | Send a WhatsApp text message |
+| `whatsapp_list_chats` | List recent chats (up to 100) |
+| `whatsapp_read_messages` | Read recent messages from a phone-number chat |
+| `whatsapp_logout` | Log out and clear the current WhatsApp connection |
+
+## Important Note
+
+<Warning>
+  WhatsApp MCP API is built on **whatsapp-web.js**, an **unofficial**, reverse-engineered WhatsApp Web client. It is not affiliated with, endorsed by, or supported by Meta or WhatsApp Inc.
+
+  Using unofficial automation tools may violate [WhatsApp's Terms of Service](https://www.whatsapp.com/legal/terms-of-service). Your account could be rate-limited, flagged, or banned. Only use this server with accounts and recipients you own or have explicit permission to message. Do not use it for spam, bulk messaging, or any commercial messaging without appropriate authorisation.
+</Warning>

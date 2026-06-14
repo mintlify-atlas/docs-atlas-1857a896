@@ -1,0 +1,62 @@
+---
+title: "WhatsApp Authentication: Linked Devices Explained"
+sidebarTitle: "Overview"
+description: "Understand how WhatsApp MCP API authenticates using WhatsApp Linked Devices, local session storage, and phone-number pairing codes."
+---
+
+WhatsApp MCP API authenticates by registering itself as a **Linked Device** on your personal WhatsApp account — the same mechanism used by the official WhatsApp Web and WhatsApp Desktop apps. There are no passwords, API tokens, or third-party credentials involved. The server uses [whatsapp-web.js](https://wwebjs.dev/) to drive a local Chrome or Chromium browser that connects directly to WhatsApp's infrastructure, and your session is stored entirely on your own machine.
+
+## How Authentication Works
+
+The full pairing flow from cold start to ready state looks like this:
+
+1. **Chrome launches** — On first start (or after `POST /api/auth/start`), the server spawns a Chrome or Chromium browser via Puppeteer using the executable at `WHATSAPP_CHROME_EXECUTABLE`. The client state moves to `starting`.
+
+2. **WhatsApp Web loads** — Chrome opens `web.whatsapp.com` inside the managed browser profile stored in `.wwebjs_auth/session-default`. If no saved session exists, WhatsApp Web prompts for device linking.
+
+3. **User pairs the device** — You have two options to complete the link (see [Two Pairing Methods](#two-pairing-methods) below). Once WhatsApp receives the pairing signal the client state advances to `authenticated`.
+
+4. **Session saved locally** — After a successful pair, whatsapp-web.js persists the full Chrome user profile — including WhatsApp Web's IndexedDB encryption keys — inside `.wwebjs_auth/session-default`. The client state then moves to `ready`.
+
+5. **Automatic reconnect on restart** — On every subsequent server start, Chrome loads the saved profile and reconnects to WhatsApp without requiring a new QR scan or pairing code. The state transitions directly from `starting` to `authenticated` to `ready`.
+
+## Authentication States
+
+The server tracks a `state` field that is returned by `GET /api/status`. Each value represents a distinct phase of the connection lifecycle:
+
+| State | Meaning |
+|---|---|
+| `stopped` | Server has not been started or the client has not been initialized. |
+| `starting` | Client is initializing — Chrome is launching and WhatsApp Web is loading. |
+| `qr` | A QR code has been received from WhatsApp Web and is waiting to be scanned. |
+| `authenticated` | Pairing completed; the session is being loaded into the client. |
+| `ready` | Fully connected and authenticated. All API calls are available. |
+| `auth_failure` | Authentication failed. The `last_error` field contains the reason. |
+| `disconnected` | WhatsApp Web disconnected after a previously ready session. |
+
+Poll `GET /api/status` to track progress and determine when the client is ready to accept API calls.
+
+## Two Pairing Methods
+
+WhatsApp MCP API supports both pairing methods that WhatsApp offers for Linked Devices:
+
+### Phone-Number Pairing Code (Recommended for Headless)
+
+`POST /api/pairing-code` accepts your phone number and returns an 8-digit numeric code. You then enter this code directly in the WhatsApp mobile app under **Linked Devices → Link with phone number instead**. No browser window or camera is required, which makes this the preferred method for server, CI, or headless environments.
+
+### QR Code (Browser-Based)
+
+`GET /qr` serves an HTML page that renders the current QR code as an image and auto-refreshes every 5 seconds. Open this URL in any browser while the server is in the `qr` state, then scan the code with your phone's WhatsApp camera under **Linked Devices → Link a device**.
+
+<CardGroup cols={2}>
+  <Card title="Pairing Code" icon="hash" href="/authentication/pairing-code">
+    Request a numeric code via `POST /api/pairing-code` and link without a QR scan.
+  </Card>
+  <Card title="Session Management" icon="floppy-disk" href="/authentication/session">
+    Learn how sessions are stored in `.wwebjs_auth` and how to back up or reset them.
+  </Card>
+</CardGroup>
+
+<Warning>
+  WhatsApp MCP API is built on **whatsapp-web.js**, an unofficial WhatsApp Web client. It is not affiliated with or endorsed by Meta/WhatsApp. Use it only with accounts and recipients you own or have explicit permission to message.
+</Warning>

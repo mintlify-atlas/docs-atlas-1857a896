@@ -1,0 +1,179 @@
+---
+title: "WhatsApp MCP-over-HTTP Endpoint for AI Agents"
+sidebarTitle: "Overview"
+description: "The WhatsApp MCP API exposes a JSON-RPC 2.0 MCP endpoint at POST /mcp for integrating WhatsApp tools into AI agents and MCP-compatible clients."
+---
+
+The WhatsApp MCP API implements the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) — a standard that lets AI agents discover and invoke typed tools at runtime. Rather than hard-coding API calls, an MCP-compatible agent queries the server for its tool list, reads the input schemas, and calls any tool by name. This server exposes **7 WhatsApp tools** over a single HTTP endpoint so that any MCP client — Claude Desktop, a custom orchestrator, or any JSON-RPC consumer — can send and receive WhatsApp messages programmatically.
+
+## Endpoint Details
+
+| Field | Value |
+|---|---|
+| **URL** | `POST http://127.0.0.1:8790/mcp` |
+| **Protocol** | JSON-RPC 2.0 |
+| **MCP Protocol Version** | `2024-11-05` |
+| **Content-Type** | `application/json` |
+| **Session Header** | `mcp-session-id` (returned in every response) |
+| **Server Name** | `whatsapp-mcp-api` |
+| **Server Version** | `0.2.0` |
+
+<Note>
+  The host and port can be overridden with the `WHATSAPP_MCP_HOST` and `WHATSAPP_MCP_PORT` environment variables, but the default is `127.0.0.1:8790`.
+</Note>
+
+## Supported MCP Methods
+
+All requests are `POST /mcp` with a JSON-RPC 2.0 body. The server routes on the `method` field.
+
+| Method | Description |
+|---|---|
+| `initialize` | Handshake — returns server capabilities and protocol version |
+| `notifications/initialized` | Acknowledge initialization complete (server responds with HTTP 202, no body) |
+| `tools/list` | Returns the full list of available WhatsApp tools with their input schemas |
+| `tools/call` | Invoke a specific tool by name, passing arguments as a JSON object |
+
+## Initialization Flow
+
+Every MCP session begins with an `initialize` handshake. Send the request once, save the `mcp-session-id` from the response header, and reuse it for all subsequent calls in the session.
+
+```json
+// Request — POST http://127.0.0.1:8790/mcp
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {}
+  }
+}
+```
+
+```json
+// Response — HTTP 200
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {}
+    },
+    "serverInfo": {
+      "name": "whatsapp-mcp-api",
+      "version": "0.2.0"
+    }
+  }
+}
+```
+
+After receiving the `initialize` response, send a `notifications/initialized` acknowledgment. The server returns HTTP 202 with no body.
+
+```json
+// Request
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "notifications/initialized",
+  "params": {}
+}
+```
+
+## List Tools
+
+Retrieve the full tool manifest at any time. The response includes each tool's `name`, `description`, and `inputSchema` so the agent knows exactly what arguments to pass.
+
+```json
+// Request
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+```
+
+## Call a Tool
+
+Invoke any tool by passing its name and a matching `arguments` object. The example below sends a WhatsApp text message.
+
+```json
+// Request
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "whatsapp_send_message",
+    "arguments": {
+      "phone_number": "15551234567",
+      "message": "hello from agent"
+    }
+  }
+}
+```
+
+```json
+// Response — HTTP 200
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{...}"
+      }
+    ]
+  }
+}
+```
+
+<Note>
+  Every tool response is wrapped in a `content` array where each item has `type: "text"` and a `text` field containing a JSON-serialized string. Parse `text` to get the structured result object.
+</Note>
+
+## Session Header
+
+The server tracks calls with a `mcp-session-id` header. It is returned on **every** response and can optionally be included in subsequent requests to maintain a named session.
+
+- **If you omit `mcp-session-id`** in a request, a new UUID is auto-generated for that response.
+- **If you include `mcp-session-id`** in a request, the same value is echoed back in the response header.
+
+```bash
+# First call — no session header sent
+curl -s -D - -X POST http://127.0.0.1:8790/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}}}' \
+  | grep -i mcp-session-id
+# mcp-session-id: 3f8a2c1e-...
+
+# Subsequent calls — pass the received session ID
+curl -s -X POST http://127.0.0.1:8790/mcp \
+  -H "Content-Type: application/json" \
+  -H "mcp-session-id: 3f8a2c1e-..." \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+## AI Agent Integration
+
+Any MCP-compatible client or AI orchestrator can point to `POST http://127.0.0.1:8790/mcp` and immediately discover all 7 WhatsApp tools via `tools/list`. The workflow is:
+
+1. **Start the server** — `node server.js` (runs on `127.0.0.1:8790` by default).
+2. **Authenticate WhatsApp** — call `whatsapp_start_auth` or `whatsapp_pairing_code` to link a phone. The session is persisted in the `.wwebjs_auth` directory so subsequent restarts skip re-authentication.
+3. **Point your agent at the endpoint** — configure the MCP client URL to `http://127.0.0.1:8790/mcp`.
+4. **Let the agent call tools** — the agent can check status, list chats, read messages, and send messages all through standard MCP `tools/call` requests.
+
+<Tip>
+  CORS headers are included on every response (`access-control-allow-origin: *`), so browser-based MCP clients and local dashboards can call the endpoint without proxy configuration.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="MCP Tool Reference" icon="wrench" href="/mcp/tools">
+    Full parameter and response documentation for all 7 WhatsApp tools.
+  </Card>
+  <Card title="REST API Overview" icon="code" href="/api-reference/overview">
+    Explore the traditional REST endpoints for direct HTTP integration.
+  </Card>
+</CardGroup>
